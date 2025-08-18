@@ -1,0 +1,38 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: product-service-deployment
+spec:
+  replicas: 2 # Jalankan 2 pod untuk high availability
+  selector:
+    matchLabels:
+      app: product-service
+  template:
+    metadata:
+      labels:
+        app: product-service
+    spec:
+      containers:
+      - name: product-service
+        image: fnb/product-service:1.0 # Nama image yang sudah Anda build & push ke registry
+        ports:
+        - containerPort: 8083
+        env:
+        - name: DB_HOST
+          value: "nama-service-postgres" # Akan didapat dari service K8s lain
+        - name: REDIS_ADDR
+          value: "nama-service-redis:6379"
+        # ... env vars lainnya bisa ditaruh di ConfigMap/Secret
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: product-service # Ini akan menjadi alamat DNS internal: http://product-service
+spec:
+  selector:
+    app: product-service
+  ports:
+  - protocol: TCP
+    port: 8083 # Port yang diexpose service
+    targetPort: 8083 # Port di dalam container

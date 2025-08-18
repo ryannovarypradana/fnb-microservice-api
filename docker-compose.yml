@@ -1,0 +1,133 @@
+version: '3.8'
+
+services:
+  # --- INFRASTRUCTURE ---
+  postgres:
+    image: postgres:13-alpine
+    container_name: postgres_db
+    environment:
+      POSTGRES_USER: ${DB_USER:-user}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-password}
+      POSTGRES_DB: ${DB_NAME:-fnb_db}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: rabbitmq_bus
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+
+  redis:
+    image: redis:6-alpine
+    container_name: redis_cache
+    ports:
+      - "6379:6379"
+
+  # --- API GATEWAY (PINTU MASUK UTAMA) ---
+  api-gateway:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        SERVICE_NAME: api-gateway
+    container_name: api_gateway
+    ports:
+      - "8080:8080" # Port utama yang diakses dari luar
+    environment:
+      - JWT_SECRET=${JWT_SECRET}
+      - AUTH_SERVICE_ADDR=http://auth-service:8081
+      - USER_SERVICE_ADDR=http://user-service:8082
+      - PRODUCT_SERVICE_ADDR=http://product-service:8083
+      - ORDER_SERVICE_ADDR=http://order-service:8084
+    depends_on:
+      - auth-service
+      - user-service
+      - product-service
+      - order-service
+
+  # --- APLIKASI MICROSERVICES ---
+  auth-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        SERVICE_NAME: auth-service
+    ports:
+      - "8081:8081"
+    environment:
+      - JWT_SECRET=${JWT_SECRET}
+      - DB_HOST=postgres
+      - DB_USER=${DB_USER}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_NAME=${DB_NAME}
+    depends_on:
+      - postgres
+
+  user-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        SERVICE_NAME: user-service
+    ports:
+      - "8082:8082"
+    environment:
+      - JWT_SECRET=${JWT_SECRET}
+      - DB_HOST=postgres
+      # ... env vars lain ...
+    depends_on:
+      - postgres
+
+  product-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        SERVICE_NAME: product-service
+    ports:
+      - "8083:8083"
+    environment:
+      - JWT_SECRET=${JWT_SECRET}
+      - DB_HOST=postgres
+      - REDIS_ADDR=redis:6379
+      # ...
+    depends_on:
+      - postgres
+      - redis
+
+  order-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        SERVICE_NAME: order-service
+    ports:
+      - "8084:8084"
+    environment:
+      - JWT_SECRET=${JWT_SECRET}
+      - DB_HOST=postgres
+      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
+      - PRODUCT_SERVICE_URL=http://product-service:8083
+      # ...
+    depends_on:
+      - postgres
+      - rabbitmq
+      - product-service
+
+  notification-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        SERVICE_NAME: notification-service
+    environment:
+      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
+    depends_on:
+      - rabbitmq
+
+volumes:
+  postgres_data:
