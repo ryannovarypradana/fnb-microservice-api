@@ -1,56 +1,101 @@
-// internal/product/service.go
 package product
 
 import (
-	"fnb-system/pkg/dto"
-	"fnb-system/pkg/model"
+	"context"
+	"errors"
+
+	"github.com/google/uuid"
+	"github.com/ryannovarypradana/fnb-microservice-api/pkg/grpc/protoc/product"
+	"github.com/ryannovarypradana/fnb-microservice-api/pkg/grpc/protoc/store" // <-- Import proto store
+	"github.com/ryannovarypradana/fnb-microservice-api/pkg/model"
 )
 
-// Tambahkan GetMenuByID ke interface
-type ProductService interface {
-	CreateCategory(req dto.CategoryRequest) (*model.Category, error)
-	GetAllCategories() (*[]model.Category, error)
-	CreateMenu(req dto.MenuRequest) (*model.Menu, error)
-	GetAllMenus() (*[]model.Menu, error)
-	GetMenuByID(id uint) (*model.Menu, error) // <-- Tambahkan ini
+type Service interface {
+	CreateProduct(ctx context.Context, req *product.CreateProductRequest) (*model.Product, error)
+	GetProductByID(ctx context.Context, id string) (*model.Product, error)
+	GetAllProducts(ctx context.Context, req *product.GetAllProductsRequest) ([]*model.Product, error)
+	UpdateProduct(ctx context.Context, req *product.UpdateProductRequest) (*model.Product, error)
+	DeleteProduct(ctx context.Context, id string) error
 }
 
 type productService struct {
-	repo ProductRepository
+	repo        Repository
+	storeClient store.StoreServiceClient // <-- Tambahkan field untuk store client
 }
 
-func NewProductService(repo ProductRepository) ProductService {
-	return &productService{repo}
-}
-
-// Tambahkan implementasi fungsi GetMenuByID
-func (s *productService) GetMenuByID(id uint) (*model.Menu, error) {
-	return s.repo.FindMenuByID(id)
-}
-
-// --- Fungsi yang sudah ada sebelumnya ---
-
-func (s *productService) CreateCategory(req dto.CategoryRequest) (*model.Category, error) {
-	category := model.Category{
-		Name: req.Name,
+// Perbarui constructor untuk menerima storeClient
+func NewService(repo Repository, storeClient store.StoreServiceClient) Service {
+	return &productService{
+		repo:        repo,
+		storeClient: storeClient,
 	}
-	return s.repo.CreateCategory(&category)
 }
 
-func (s *productService) GetAllCategories() (*[]model.Category, error) {
-	return s.repo.FindAllCategories()
-}
-
-func (s *productService) CreateMenu(req dto.MenuRequest) (*model.Menu, error) {
-	menu := model.Menu{
-		Name:       req.Name,
-		CategoryID: req.CategoryID,
-		Price:      req.Price,
-		ImageURL:   req.ImageURL,
+func (s *productService) CreateProduct(ctx context.Context, req *product.CreateProductRequest) (*model.Product, error) {
+	storeUUID, err := uuid.Parse(req.GetStoreId())
+	if err != nil {
+		return nil, errors.New("invalid store id format")
 	}
-	return s.repo.CreateMenu(&menu)
+
+	// === PANGGILAN GPRC UNTUK VALIDASI TOKO ===
+	_, err = s.storeClient.GetStore(ctx, &store.GetStoreRequest{Id: req.GetStoreId()})
+	if err != nil {
+		return nil, errors.New("toko yang dituju tidak valid atau tidak ditemukan")
+	}
+	// =======================================
+
+	newProduct := &model.Product{
+		Name:        req.GetName(),
+		Description: req.GetDescription(),
+		Price:       req.GetPrice(),
+		StoreID:     storeUUID,
+	}
+
+	if err := s.repo.Create(ctx, newProduct); err != nil {
+		return nil, err
+	}
+	return newProduct, nil
 }
 
-func (s *productService) GetAllMenus() (*[]model.Menu, error) {
-	return s.repo.FindAllMenus() // <-- INI YANG BENAR
+// (Sisa fungsi service lainnya tidak berubah)
+
+func (s *productService) GetProductByID(ctx context.Context, id string) (*model.Product, error) {
+	productUUID, err := uuid.Parse(id)
+	if err != nil {
+		return nil, err
+	}
+	return s.repo.FindByID(ctx, productUUID)
+}
+
+func (s *productService) GetAllProducts(ctx context.Context, req *product.GetAllProductsRequest) ([]*model.Product, error) {
+	return s.repo.FindAll(ctx, req.GetSearch(), req.GetStoreId())
+}
+
+func (s *productService) UpdateProduct(ctx context.Context, req *product.UpdateProductRequest) (*model.Product, error) {
+	productUUID, err := uuid.Parse(req.GetId())
+	if err != nil {
+		return nil, err
+	}
+
+	productToUpdate, err := s.repo.FindByID(ctx, productUUID)
+	if err != nil {
+		return nil, errors.New("product not found")
+	}
+
+	productToUpdate.Name = req.GetName()
+	productToUpdate.Description = req.GetDescription()
+	productToUpdate.Price = req.GetPrice()
+
+	if err := s.repo.Update(ctx, productToUpdate); err != nil {
+		return nil, err
+	}
+	return productToUpdate, nil
+}
+
+func (s *productService) DeleteProduct(ctx context.Context, id string) error {
+	productUUID, err := uuid.Parse(id)
+	if err != nil {
+		return err
+	}
+	return s.repo.Delete(ctx, productUUID)
 }

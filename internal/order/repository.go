@@ -1,57 +1,56 @@
-// internal/order/repository.go
+// /internal/order/repository.go
 package order
 
 import (
-	"fnb-system/pkg/model"
+	"context"
 
+	"github.com/google/uuid"
+	"github.com/ryannovarypradana/fnb-microservice-api/pkg/model"
 	"gorm.io/gorm"
 )
 
-type OrderRepository interface {
-	CreateOrderInTx(order *model.Order, items *[]model.OrderItem) (*model.Order, error)
-	FindOrdersByUserID(userID uint) (*[]model.Order, error)
+type Repository interface {
+	Create(ctx context.Context, order *model.Order, items []model.OrderItem) error // FIX: Changed type here
+	FindByID(ctx context.Context, id uuid.UUID) (*model.Order, error)
+	FindAllByUserID(ctx context.Context, userID uuid.UUID) ([]*model.Order, error)
 }
 
 type orderRepository struct {
 	db *gorm.DB
 }
 
-func NewOrderRepository(db *gorm.DB) OrderRepository {
-	return &orderRepository{db}
+func NewRepository(db *gorm.DB) Repository {
+	return &orderRepository{db: db}
 }
 
-func (r *orderRepository) FindOrdersByUserID(userID uint) (*[]model.Order, error) {
-	var orders []model.Order
-	// Ambil semua order beserta item-item dan menu terkaitnya
-	err := r.db.Preload("OrderItems.Menu").Where("user_id = ?", userID).Find(&orders).Error
-	if err != nil {
-		return nil, err
-	}
-	return &orders, nil
+func (r *orderRepository) Create(ctx context.Context, order *model.Order, items []model.OrderItem) error { // FIX: Changed type here
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Create(order).Error; err != nil {
+			return err
+		}
+		for i := range items {
+			items[i].OrderID = order.ID
+		}
+		if err := tx.Create(&items).Error; err != nil { // Pass address of slice
+			return err
+		}
+		return nil
+	})
 }
 
-func (r *orderRepository) CreateOrderInTx(order *model.Order, items *[]model.OrderItem) (*model.Order, error) {
-	// Mulai transaksi
-	tx := r.db.Begin()
-	if tx.Error != nil {
-		return nil, tx.Error
-	}
-
-	// 1. Simpan data order utama
-	if err := tx.Create(order).Error; err != nil {
-		tx.Rollback() // Batalkan transaksi jika gagal
+// ... rest of the file is the same
+func (r *orderRepository) FindByID(ctx context.Context, id uuid.UUID) (*model.Order, error) {
+	var order model.Order
+	if err := r.db.WithContext(ctx).Preload("Items").First(&order, "id = ?", id).Error; err != nil {
 		return nil, err
 	}
+	return &order, nil
+}
 
-	// 2. Kaitkan setiap item dengan OrderID yang baru dibuat, lalu simpan
-	for i := range *items {
-		(*items)[i].OrderID = order.ID
-	}
-	if err := tx.Create(items).Error; err != nil {
-		tx.Rollback()
+func (r *orderRepository) FindAllByUserID(ctx context.Context, userID uuid.UUID) ([]*model.Order, error) {
+	var orders []*model.Order
+	if err := r.db.WithContext(ctx).Preload("Items").Where("user_id = ?", userID).Find(&orders).Error; err != nil {
 		return nil, err
 	}
-
-	// Jika semua berhasil, commit transaksi
-	return order, tx.Commit().Error
+	return orders, nil
 }

@@ -1,128 +1,104 @@
-// internal/order/service.go
 package order
 
 import (
-	"encoding/json"
+	"context"
 	"errors"
 	"fmt"
-	"fnb-system/pkg/dto"
-	"fnb-system/pkg/eventbus"
-	"fnb-system/pkg/model"
-	"net/http"
+	"log"
+
+	"github.com/google/uuid"
+	"github.com/ryannovarypradana/fnb-microservice-api/pkg/eventbus"
+	"github.com/ryannovarypradana/fnb-microservice-api/pkg/grpc/protoc/order"
+	"github.com/ryannovarypradana/fnb-microservice-api/pkg/grpc/protoc/product"
+	"github.com/ryannovarypradana/fnb-microservice-api/pkg/model"
 )
 
-// ProductClient adalah interface untuk berkomunikasi dengan Product Service.
-type ProductClient interface {
-	GetMenuByID(id uint) (*model.Menu, error)
+type Service interface {
+	CreateOrder(ctx context.Context, req *order.CreateOrderRequest) (*model.Order, error)
+	GetOrderByID(ctx context.Context, id string) (*model.Order, error)
+	GetAllOrdersByUserID(ctx context.Context, userID string) ([]*model.Order, error)
 }
 
-// OrderService mendefinisikan kontrak untuk logika bisnis pesanan.
-type OrderService interface {
-	CreateOrder(userID uint, req dto.CreateOrderRequest) (*model.Order, error)
-	GetMyOrders(userID uint) (*[]model.Order, error)
-}
-
-// orderService adalah implementasi dari OrderService.
 type orderService struct {
-	repo          OrderRepository
-	productClient ProductClient
-	eventBus      eventbus.EventBus // Dependensi untuk RabbitMQ
+	repo           Repository
+	productClient  product.ProductServiceClient
+	eventPublisher eventbus.Publisher
 }
 
-// NewOrderService membuat instance baru dari orderService.
-func NewOrderService(repo OrderRepository, productClient ProductClient, bus eventbus.EventBus) OrderService {
+func NewService(repo Repository, productClient product.ProductServiceClient, publisher eventbus.Publisher) Service {
 	return &orderService{
-		repo:          repo,
-		productClient: productClient,
-		eventBus:      bus,
+		repo:           repo,
+		productClient:  productClient,
+		eventPublisher: publisher,
 	}
 }
 
-// GetMyOrders mengambil riwayat pesanan milik seorang user.
-func (s *orderService) GetMyOrders(userID uint) (*[]model.Order, error) {
-	return s.repo.FindOrdersByUserID(userID)
-}
+func (s *orderService) CreateOrder(ctx context.Context, req *order.CreateOrderRequest) (*model.Order, error) {
+	userUUID, err := uuid.Parse(req.GetUserId())
+	if err != nil {
+		return nil, errors.New("invalid user id format")
+	}
 
-// CreateOrder adalah logika inti untuk membuat pesanan.
-func (s *orderService) CreateOrder(userID uint, req dto.CreateOrderRequest) (*model.Order, error) {
 	var orderItems []model.OrderItem
 	var totalPrice float64
-
-	if len(req.Items) == 0 {
-		return nil, errors.New("order must have at least one item")
-	}
-
-	// 1. Validasi setiap item dan hitung total harga
-	for _, itemReq := range req.Items {
-		// Panggil Product Service untuk mendapatkan detail menu
-		menu, err := s.productClient.GetMenuByID(itemReq.MenuID)
+	for _, item := range req.GetItems() {
+		productInfo, err := s.productClient.GetProduct(ctx, &product.GetProductRequest{Id: item.GetProductId()})
 		if err != nil {
-			return nil, fmt.Errorf("menu with id %d not found or product service is down", itemReq.MenuID)
+			return nil, fmt.Errorf("product with id %s not found", item.GetProductId())
 		}
 
-		itemPrice := menu.Price * float64(itemReq.Quantity)
-		totalPrice += itemPrice
+		price := productInfo.GetProduct().GetPrice()
+		subtotal := price * float64(item.GetQuantity())
+		totalPrice += subtotal
 
 		orderItems = append(orderItems, model.OrderItem{
-			MenuID:   itemReq.MenuID,
-			Quantity: itemReq.Quantity,
-			Price:    itemPrice, // Simpan harga total per item saat itu
+			ProductID: uuid.MustParse(item.GetProductId()),
+			Quantity:  int(item.GetQuantity()),
+			Subtotal:  subtotal,
 		})
 	}
 
-	// 2. Buat objek Order utama
-	newOrder := model.Order{
-		UserID:     userID,
+	newOrder := &model.Order{
+		UserID:     userUUID,
+		Status:     "PENDING",
 		TotalPrice: totalPrice,
-		Status:     "pending",
 	}
 
-	// 3. Simpan ke database menggunakan transaksi
-	createdOrder, err := s.repo.CreateOrderInTx(&newOrder, &orderItems)
-	if err != nil {
+	if err := s.repo.Create(ctx, newOrder, orderItems); err != nil {
 		return nil, err
 	}
 
-	// 4. Publikasikan event ke RabbitMQ setelah pesanan berhasil dibuat
+	log.Printf("Mempublikasikan event 'order.created' untuk Order ID: %s", newOrder.ID.String())
 	eventPayload := map[string]interface{}{
-		"order_id":    createdOrder.ID,
-		"user_id":     createdOrder.UserID,
-		"total_price": createdOrder.TotalPrice,
-		"status":      createdOrder.Status,
+		"order_id":    newOrder.ID.String(),
+		"user_id":     newOrder.UserID.String(),
+		"total_price": newOrder.TotalPrice,
+		"status":      newOrder.Status,
 	}
-	// Menggunakan goroutine agar tidak memblokir response ke user
-	go s.eventBus.Publish("orders", "order.created", eventPayload)
 
-	return createdOrder, nil
+	go func() {
+		err := s.eventPublisher.Publish("fnb_events", "order.created", "application/json", eventPayload)
+		if err != nil {
+			log.Printf("ERROR: Gagal mempublikasikan event order.created untuk Order ID %s: %v", newOrder.ID.String(), err)
+		}
+	}()
+
+	newOrder.Items = orderItems
+	return newOrder, nil
 }
 
-// --- Implementasi HTTP Client untuk Product Service ---
-
-type productClient struct {
-	baseURL string
-}
-
-func NewProductClient(baseURL string) ProductClient {
-	return &productClient{baseURL}
-}
-
-func (c *productClient) GetMenuByID(id uint) (*model.Menu, error) {
-	// Di Product Service, kita perlu membuat endpoint ini: GET /api/v1/menus/:id
-	url := fmt.Sprintf("%s/api/v1/menus/%d", c.baseURL, id)
-	resp, err := http.Get(url)
+func (s *orderService) GetOrderByID(ctx context.Context, id string) (*model.Order, error) {
+	orderUUID, err := uuid.Parse(id)
 	if err != nil {
-		return nil, fmt.Errorf("failed to call product service: %w", err)
+		return nil, err
 	}
-	defer resp.Body.Close()
+	return s.repo.FindByID(ctx, orderUUID)
+}
 
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("product service returned status %d", resp.StatusCode)
+func (s *orderService) GetAllOrdersByUserID(ctx context.Context, userID string) ([]*model.Order, error) {
+	userUUID, err := uuid.Parse(userID)
+	if err != nil {
+		return nil, err
 	}
-
-	var menu model.Menu
-	if err := json.NewDecoder(resp.Body).Decode(&menu); err != nil {
-		return nil, fmt.Errorf("failed to decode product response: %w", err)
-	}
-
-	return &menu, nil
+	return s.repo.FindAllByUserID(ctx, userUUID)
 }

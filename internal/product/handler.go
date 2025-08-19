@@ -1,88 +1,83 @@
-// internal/product/handler.go
 package product
 
 import (
-	"fnb-system/pkg/dto"
-	"strconv"
+	"context"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/ryannovarypradana/fnb-microservice-api/pkg/grpc/protoc/product"
 )
 
-type ProductHandler struct {
-	service ProductService
+type GRPCHandler struct {
+	product.UnimplementedProductServiceServer
+	service Service
 }
 
-func NewProductHandler(service ProductService) *ProductHandler {
-	return &ProductHandler{service}
+func NewGRPCHandler(s Service) *GRPCHandler {
+	return &GRPCHandler{service: s}
 }
 
-// --- Category Handlers ---
-
-func (h *ProductHandler) CreateCategory(c *fiber.Ctx) error {
-	var req dto.CategoryRequest
-	if err := c.BodyParser(&req); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Cannot parse JSON"})
-	}
-
-	// Anda dapat menambahkan validasi untuk request body di sini
-
-	category, err := h.service.CreateCategory(req)
+func (h *GRPCHandler) CreateProduct(ctx context.Context, req *product.CreateProductRequest) (*product.CreateProductResponse, error) {
+	p, err := h.service.CreateProduct(ctx, req)
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+		return nil, err
 	}
-
-	return c.Status(fiber.StatusCreated).JSON(category)
+	return &product.CreateProductResponse{Product: &product.Product{
+		Id:          p.ID.String(),
+		Name:        p.Name,
+		Description: p.Description,
+		Price:       p.Price,
+		StoreId:     p.StoreID.String(),
+	}}, nil
 }
 
-func (h *ProductHandler) GetAllCategories(c *fiber.Ctx) error {
-	categories, err := h.service.GetAllCategories()
+func (h *GRPCHandler) GetProduct(ctx context.Context, req *product.GetProductRequest) (*product.GetProductResponse, error) {
+	p, err := h.service.GetProductByID(ctx, req.GetId())
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+		return nil, err
 	}
-	return c.Status(fiber.StatusOK).JSON(categories)
+	return &product.GetProductResponse{Product: &product.Product{
+		Id:          p.ID.String(),
+		Name:        p.Name,
+		Description: p.Description,
+		Price:       p.Price,
+		StoreId:     p.StoreID.String(),
+	}}, nil
 }
 
-// --- Menu Handlers ---
-
-func (h *ProductHandler) CreateMenu(c *fiber.Ctx) error {
-	var req dto.MenuRequest
-	if err := c.BodyParser(&req); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Cannot parse JSON"})
-	}
-
-	// Anda dapat menambahkan validasi untuk request body di sini
-
-	menu, err := h.service.CreateMenu(req)
+func (h *GRPCHandler) GetAllProducts(ctx context.Context, req *product.GetAllProductsRequest) (*product.GetAllProductsResponse, error) {
+	products, err := h.service.GetAllProducts(ctx, req)
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+		return nil, err
 	}
-
-	return c.Status(fiber.StatusCreated).JSON(menu)
+	var productMessages []*product.Product
+	for _, p := range products {
+		productMessages = append(productMessages, &product.Product{
+			Id:          p.ID.String(),
+			Name:        p.Name,
+			Description: p.Description,
+			Price:       p.Price,
+			StoreId:     p.StoreID.String(),
+		})
+	}
+	return &product.GetAllProductsResponse{Products: productMessages}, nil
 }
 
-func (h *ProductHandler) GetAllMenus(c *fiber.Ctx) error {
-	menus, err := h.service.GetAllMenus()
+func (h *GRPCHandler) UpdateProduct(ctx context.Context, req *product.UpdateProductRequest) (*product.UpdateProductResponse, error) {
+	p, err := h.service.UpdateProduct(ctx, req)
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+		return nil, err
 	}
-	return c.Status(fiber.StatusOK).JSON(menus)
+	return &product.UpdateProductResponse{Product: &product.Product{
+		Id:          p.ID.String(),
+		Name:        p.Name,
+		Description: p.Description,
+		Price:       p.Price,
+		StoreId:     p.StoreID.String(),
+	}}, nil
 }
 
-// GetMenuByID menangani permintaan untuk mendapatkan satu menu berdasarkan ID.
-// Ini adalah fungsi yang kita tambahkan untuk memperbaiki error sebelumnya.
-func (h *ProductHandler) GetMenuByID(c *fiber.Ctx) error {
-	// Ambil ID dari parameter URL
-	id, err := strconv.Atoi(c.Params("id"))
-	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid ID format"})
+func (h *GRPCHandler) DeleteProduct(ctx context.Context, req *product.DeleteProductRequest) (*product.DeleteProductResponse, error) {
+	if err := h.service.DeleteProduct(ctx, req.GetId()); err != nil {
+		return nil, err
 	}
-
-	// Panggil service untuk mendapatkan data menu
-	menu, err := h.service.GetMenuByID(uint(id))
-	if err != nil {
-		// Kemungkinan besar menu tidak ditemukan
-		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "Menu not found"})
-	}
-
-	return c.Status(fiber.StatusOK).JSON(menu)
+	return &product.DeleteProductResponse{Message: "Product deleted successfully"}, nil
 }

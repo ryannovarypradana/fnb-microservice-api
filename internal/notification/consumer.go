@@ -1,58 +1,132 @@
-// internal/notification/consumer.go
 package notification
 
 import (
+	"encoding/json"
 	"log"
+	"time"
 
 	"github.com/streadway/amqp"
 )
 
-func StartOrderCreatedConsumer(rabbitURL string) {
-	conn, err := amqp.Dial(rabbitURL)
-	if err != nil {
-		log.Fatalf("Failed to connect to RabbitMQ: %v", err)
-	}
-	defer conn.Close()
+type Consumer interface {
+	StartConsuming()
+}
 
-	ch, err := conn.Channel()
+type rabbitMQConsumer struct {
+	conn *amqp.Connection
+	url  string
+}
+
+func NewRabbitMQConsumer(url string) (Consumer, error) {
+	conn, err := amqp.Dial(url)
 	if err != nil {
-		log.Fatalf("Failed to open a channel: %v", err)
+		return nil, err
 	}
+	return &rabbitMQConsumer{conn: conn, url: url}, nil
+}
+
+func (c *rabbitMQConsumer) StartConsuming() {
+	ch, err := c.conn.Channel()
+	failOnError(err, "Gagal membuka channel")
 	defer ch.Close()
 
-	// Pastikan exchange "orders" ada
-	err = ch.ExchangeDeclare("orders", "topic", true, false, false, false, nil)
-	if err != nil {
-		log.Fatalf("Failed to declare an exchange: %v", err)
-	}
+	err = ch.ExchangeDeclare(
+		"fnb_events", // nama exchange
+		"topic",      // tipe exchange
+		true,         // durable
+		false,        // auto-deleted
+		false,        // internal
+		false,        // no-wait
+		nil,          // arguments
+	)
+	failOnError(err, "Gagal mendeklarasikan exchange")
 
-	// Buat queue sementara yang unik untuk service ini
-	q, err := ch.QueueDeclare("", false, false, true, false, nil)
-	if err != nil {
-		log.Fatalf("Failed to declare a queue: %v", err)
-	}
+	q, err := ch.QueueDeclare(
+		"notification_queue", // nama queue
+		true,                 // durable
+		false,                // delete when unused
+		false,                // exclusive
+		false,                // no-wait
+		nil,                  // arguments
+	)
+	failOnError(err, "Gagal mendeklarasikan queue")
 
-	// Ikat (bind) queue ke exchange dengan routing key "order.created"
-	err = ch.QueueBind(q.Name, "order.created", "orders", false, nil)
-	if err != nil {
-		log.Fatalf("Failed to bind a queue: %v", err)
-	}
+	// Binding queue ke exchange untuk menerima semua event user (user.*)
+	err = ch.QueueBind(
+		q.Name,       // queue name
+		"user.*",     // routing key
+		"fnb_events", // exchange
+		false,
+		nil,
+	)
+	failOnError(err, "Gagal melakukan binding queue untuk user.*")
 
-	// Mulai mengkonsumsi pesan dari queue
-	msgs, err := ch.Consume(q.Name, "", true, false, false, false, nil)
-	if err != nil {
-		log.Fatalf("Failed to register a consumer: %v", err)
-	}
+	// Binding queue yang SAMA untuk menerima semua event order (order.*)
+	err = ch.QueueBind(
+		q.Name,       // queue name
+		"order.*",    // routing key
+		"fnb_events", // exchange
+		false,
+		nil,
+	)
+	failOnError(err, "Gagal melakukan binding queue untuk order.*")
 
-	log.Println("Notification service is waiting for order.created events...")
+	msgs, err := ch.Consume(
+		q.Name, "", true, false, false, false, nil,
+	)
+	failOnError(err, "Gagal mendaftarkan consumer")
 
-	// Blok selamanya untuk terus mendengarkan
 	forever := make(chan bool)
+
 	go func() {
 		for d := range msgs {
-			log.Printf("Received an order.created event: %s", d.Body)
-			// Di sini Anda bisa menambahkan logika untuk mengirim email, push notification, dll.
+			log.Printf("Menerima event dengan routing key: %s", d.RoutingKey)
+			switch d.RoutingKey {
+			case "user.registered":
+				handleUserRegistered(d.Body)
+			case "order.created":
+				handleOrderCreated(d.Body)
+			default:
+				log.Printf("Warning: Tidak ada handler untuk routing key '%s'", d.RoutingKey)
+			}
 		}
 	}()
+
+	log.Printf(" [*] Notification service menunggu pesan. Untuk keluar tekan CTRL+C")
 	<-forever
+}
+
+func handleUserRegistered(body []byte) {
+	var payload map[string]interface{}
+	if err := json.Unmarshal(body, &payload); err != nil {
+		log.Printf("Error unmarshalling event body: %s", err)
+		return
+	}
+
+	email, _ := payload["email"].(string)
+	name, _ := payload["name"].(string)
+
+	log.Printf("SIMULASI: Mengirimkan email ke %s...", email)
+	time.Sleep(2 * time.Second)
+	log.Printf("SUCCESS: Email selamat datang telah dikirim ke %s (Nama: %s)", email, name)
+}
+
+func handleOrderCreated(body []byte) {
+	var payload map[string]interface{}
+	if err := json.Unmarshal(body, &payload); err != nil {
+		log.Printf("Error unmarshalling event body: %s", err)
+		return
+	}
+
+	orderID, _ := payload["order_id"].(string)
+
+	log.Printf("NOTIFIKASI DAPUR: Pesanan baru diterima! Order ID: %s. Mulai siapkan.", orderID)
+	time.Sleep(1 * time.Second)
+	log.Printf("SUCCESS: Notifikasi untuk Order ID %s telah dikirim ke dapur.", orderID)
+}
+
+func failOnError(err error, msg string) {
+	if err != nil {
+		log.Fatalf("%s: %s", msg, err)
+	}
 }

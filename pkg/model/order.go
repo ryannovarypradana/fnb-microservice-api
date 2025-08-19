@@ -1,24 +1,35 @@
-// pkg/model/order.go
 package model
 
-import "time"
+import (
+	"github.com/google/uuid"
+	"gorm.io/gorm"
+)
 
 type Order struct {
-	ID         uint        `gorm:"primaryKey" json:"id"`
-	UserID     uint        `json:"user_id"`
-	User       User        `gorm:"foreignKey:UserID" json:"user"`
-	TotalPrice float64     `gorm:"not null" json:"total_price"`
-	Status     string      `gorm:"size:50;not null;default:'pending'" json:"status"`
-	OrderItems []OrderItem `gorm:"foreignKey:OrderID" json:"order_items"`
-	CreatedAt  time.Time   `json:"created_at"`
-	UpdatedAt  time.Time   `json:"updated_at"`
+	ID         uuid.UUID      `json:"id" gorm:"type:uuid;primary_key;"`
+	UserID     uuid.UUID      `json:"user_id" gorm:"type:uuid"`
+	Status     string         `json:"status"`
+	TotalPrice float64        `json:"total_price"`
+	DeletedAt  gorm.DeletedAt `json:"-" gorm:"index"`
+
+	// FIX: Add the relationship to OrderItem
+	Items []OrderItem `json:"items"`
 }
 
 type OrderItem struct {
-	ID       uint    `gorm:"primaryKey" json:"id"`
-	OrderID  uint    `json:"order_id"`
-	MenuID   uint    `json:"menu_id"`
-	Menu     Menu    `gorm:"foreignKey:MenuID" json:"menu"`
-	Quantity int     `gorm:"not null" json:"quantity"`
-	Price    float64 `gorm:"not null" json:"price"` // Harga saat item dipesan
+	ID      uuid.UUID `json:"id" gorm:"type:uuid;primary_key;"`
+	OrderID uuid.UUID `json:"order_id" gorm:"type:uuid"`
+	// FIX: Field should be ProductID to match the service logic
+	ProductID uuid.UUID `json:"product_id" gorm:"type:uuid"`
+	Quantity  int       `json:"quantity"`
+	// FIX: Field should be Subtotal
+	Subtotal  float64        `json:"subtotal"`
+	DeletedAt gorm.DeletedAt `json:"-" gorm:"index"`
+}
+
+func (o *Order) BeforeCreate(tx *gorm.DB) (err error) {
+	if o.ID == uuid.Nil {
+		o.ID = uuid.New()
+	}
+	return
 }

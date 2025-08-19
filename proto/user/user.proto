@@ -1,0 +1,40 @@
+syntax = "proto3";
+
+package user;
+
+option go_package = "./pkg/grpc/protoc/user";
+
+message User {
+    string id = 1;
+    string name = 2;
+    string email = 3;
+    string role = 4;
+    string company_id = 5;
+    string store_id = 6;
+}
+
+message GetUserRequest {
+    string id = 1;
+}
+
+message GetUserResponse {
+    User user = 1;
+}
+
+message RegisterStaffRequest {
+    string name = 1;
+    string email = 2;
+    string password = 3;
+    string role = 4;
+    string store_id = 5;
+    string actor_company_id = 6; // ID Perusahaan dari user yang membuat (misal: COMPANY_REP)
+}
+
+message RegisterStaffResponse {
+    User user = 1;
+}
+
+service UserService {
+    rpc GetUser(GetUserRequest) returns (GetUserResponse);
+    rpc RegisterStaff(RegisterStaffRequest) returns (RegisterStaffResponse);
+}

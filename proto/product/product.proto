@@ -1,0 +1,71 @@
+syntax = "proto3";
+
+package product;
+
+option go_package = "./pkg/grpc/protoc/product";
+
+message Product {
+    string id = 1;
+    string name = 2;
+    string description = 3;
+    double price = 4;
+    string store_id = 5; // Tambahkan field relevan lainnya
+}
+
+// -- DEFINISI BARU --
+message CreateProductRequest {
+    string name = 1;
+    string description = 2;
+    double price = 3;
+    string store_id = 4;
+}
+
+message CreateProductResponse {
+    Product product = 1;
+}
+
+message GetProductRequest {
+    string id = 1;
+}
+
+message GetProductResponse {
+    Product product = 1;
+}
+
+message GetAllProductsRequest {
+    string search = 1;
+    string store_id = 2;
+}
+
+message GetAllProductsResponse {
+    repeated Product products = 1;
+}
+
+message UpdateProductRequest {
+    string id = 1;
+    string name = 2;
+    string description = 3;
+    double price = 4;
+}
+
+message UpdateProductResponse {
+    Product product = 1;
+}
+
+message DeleteProductRequest {
+    string id = 1;
+}
+
+message DeleteProductResponse {
+    string message = 1;
+}
+// -- AKHIR DEFINISI BARU --
+
+service ProductService {
+    // -- PERBARUI RPC --
+    rpc CreateProduct(CreateProductRequest) returns (CreateProductResponse);
+    rpc GetProduct(GetProductRequest) returns (GetProductResponse);
+    rpc GetAllProducts(GetAllProductsRequest) returns (GetAllProductsResponse);
+    rpc UpdateProduct(UpdateProductRequest) returns (UpdateProductResponse);
+    rpc DeleteProduct(DeleteProductRequest) returns (DeleteProductResponse);
+}

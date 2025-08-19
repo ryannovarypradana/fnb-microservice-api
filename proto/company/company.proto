@@ -1,0 +1,43 @@
+syntax = "proto3";
+
+package company;
+
+option go_package = "./pkg/grpc/protoc/company";
+
+message Company {
+    string id = 1;
+    string name = 2;
+    string address = 3;
+    string code = 4;
+}
+
+message GetCompanyRequest {
+    string id = 1;
+}
+
+message GetCompanyResponse {
+    Company company = 1;
+}
+
+message GetAllCompaniesRequest {
+    string search = 1;
+}
+
+message GetAllCompaniesResponse {
+    repeated Company companies = 1;
+}
+
+message CreateCompanyRequest {
+    string name = 1;
+    string address = 2;
+}
+
+message CreateCompanyResponse {
+    Company company = 1;
+}
+
+service CompanyService {
+    rpc GetCompany(GetCompanyRequest) returns (GetCompanyResponse);
+    rpc GetAllCompanies(GetAllCompaniesRequest) returns (GetAllCompaniesResponse);
+    rpc CreateCompany(CreateCompanyRequest) returns (CreateCompanyResponse);
+}

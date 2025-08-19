@@ -1,53 +1,56 @@
+// /cmd/auth-service/main.go
 package main
 
 import (
-	"fnb-system/internal/auth"
-	"fnb-system/internal/user"
-	"fnb-system/pkg/database"
-	"fnb-system/pkg/logger"
+	"fmt"
 	"log"
+	"net"
+	"os"
 
-	"github.com/gofiber/fiber/v2"
-	"github.com/gofiber/fiber/v2/middleware/cors"
-	"github.com/joho/godotenv"
-	"go.uber.org/zap"
+	"github.com/ryannovarypradana/fnb-microservice-api/internal/auth"
+	"github.com/ryannovarypradana/fnb-microservice-api/pkg/database"
+	pb "github.com/ryannovarypradana/fnb-microservice-api/pkg/grpc/protoc/auth"
+	"github.com/ryannovarypradana/fnb-microservice-api/pkg/model"
+
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/reflection"
 )
 
 func main() {
-	if err := godotenv.Load(); err != nil {
-		log.Println("Warning: .env file not found")
-	}
-
-	appLogger := logger.New()
-	defer appLogger.Sync()
+	log.Println("Starting Auth Service...")
 
 	db, err := database.NewPostgresConnection()
 	if err != nil {
-		appLogger.Fatal("Failed to connect to database", zap.Error(err))
+		log.Fatalf("failed to connect to database: %v", err)
+	}
+	log.Println("Database connection successful.")
+
+	// Migrasi User model. Pastikan semua relasi sudah didefinisikan di pkg/model
+	if err := db.AutoMigrate(&model.User{}, &model.Company{}, &model.Store{}); err != nil {
+		log.Fatalf("failed to migrate database: %v", err)
+	}
+	log.Println("Database migration completed.")
+
+	authRepo := auth.NewRepository(db)
+	authService := auth.NewService(authRepo, db)
+	authHandler := auth.NewGRPCHandler(authService)
+
+	port := os.Getenv("AUTH_SERVICE_PORT")
+	if port == "" {
+		port = "50051" // Port default
 	}
 
-	userRepo := user.NewUserRepository(db)
-	authRepo := auth.NewAuthRepository(db)
-	authSvc := auth.NewAuthService(authRepo, userRepo)
-	authHandler := auth.NewAuthHandler(authSvc)
+	lis, err := net.Listen("tcp", fmt.Sprintf(":%s", port))
+	if err != nil {
+		log.Fatalf("failed to listen: %v", err)
+	}
 
-	app := fiber.New()
-	app.Use(cors.New())
+	grpcServer := grpc.NewServer()
+	pb.RegisterAuthServiceServer(grpcServer, authHandler)
+	reflection.Register(grpcServer)
 
-	// Tambahkan endpoint Health Check
-	app.Get("/healthz", func(c *fiber.Ctx) error {
-		return c.Status(fiber.StatusOK).JSON(fiber.Map{
-			"status":  "ok",
-			"service": "auth-service",
-		})
-	})
-
-	api := app.Group("/api/v1")
-	api.Post("/register", authHandler.Register)
-	api.Post("/login", authHandler.Login)
-
-	appLogger.Info("Auth Service is starting on port 8081")
-	if err := app.Listen(":8081"); err != nil {
-		appLogger.Fatal("Failed to start server", zap.Error(err))
+	log.Printf("Auth gRPC server listening on port %s", port)
+	if err := grpcServer.Serve(lis); err != nil {
+		log.Fatalf("failed to serve gRPC: %v", err)
 	}
 }

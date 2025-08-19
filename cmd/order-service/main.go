@@ -1,71 +1,64 @@
 package main
 
 import (
-	"fnb-system/internal/order"
-	"fnb-system/pkg/database"
-	"fnb-system/pkg/eventbus"
-	"fnb-system/pkg/logger"
+	"fmt"
 	"log"
+	"net"
 	"os"
 
-	"github.com/gofiber/fiber/v2"
-	"github.com/gofiber/fiber/v2/middleware/cors"
-	"github.com/joho/godotenv"
-	"go.uber.org/zap"
+	internalOrder "github.com/ryannovarypradana/fnb-microservice-api/internal/order"
+	"github.com/ryannovarypradana/fnb-microservice-api/pkg/database"
+	"github.com/ryannovarypradana/fnb-microservice-api/pkg/eventbus" // <-- Import eventbus
+	"github.com/ryannovarypradana/fnb-microservice-api/pkg/grpc/client"
+	orderPB "github.com/ryannovarypradana/fnb-microservice-api/pkg/grpc/protoc/order"
+	"github.com/ryannovarypradana/fnb-microservice-api/pkg/model"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/reflection"
 )
 
 func main() {
-	if err := godotenv.Load(); err != nil {
-		log.Println("Warning: .env file not found")
-	}
-
-	appLogger := logger.New()
-	defer appLogger.Sync()
+	log.Println("Starting Order Service...")
 
 	db, err := database.NewPostgresConnection()
 	if err != nil {
-		appLogger.Fatal("Failed to connect to database", zap.Error(err))
+		log.Fatalf("failed to connect to database: %v", err)
 	}
 
+	if err := db.AutoMigrate(&model.Order{}, &model.OrderItem{}); err != nil {
+		log.Fatalf("failed to migrate database: %v", err)
+	}
+
+	productClient := client.NewProductClient()
+
+	// Inisialisasi RabbitMQ Publisher
 	rabbitMQURL := os.Getenv("RABBITMQ_URL")
-	if rabbitMQURL == "" {
-		rabbitMQURL = "amqp://guest:guest@localhost:5672/"
-	}
-	bus, err := eventbus.NewRabbitMQBus(rabbitMQURL)
+	publisher, err := eventbus.NewRabbitMQPublisher(rabbitMQURL)
 	if err != nil {
-		appLogger.Fatal("Failed to connect to RabbitMQ", zap.Error(err))
+		log.Fatalf("gagal terhubung ke RabbitMQ: %v", err)
 	}
-	defer bus.Close()
+	defer publisher.Close()
 
-	productServiceURL := os.Getenv("PRODUCT_SERVICE_URL")
-	if productServiceURL == "" {
-		productServiceURL = "http://localhost:8083"
+	// Suntikkan semua dependensi
+	orderRepo := internalOrder.NewRepository(db)
+	orderService := internalOrder.NewService(orderRepo, productClient, publisher) // <-- Diperbarui
+	orderHandler := internalOrder.NewGRPCHandler(orderService)
+
+	port := os.Getenv("ORDER_SERVICE_PORT")
+	if port == "" {
+		port = "50056"
 	}
 
-	productClient := order.NewProductClient(productServiceURL)
-	orderRepo := order.NewOrderRepository(db)
-	orderSvc := order.NewOrderService(orderRepo, productClient, bus)
-	orderHandler := order.NewOrderHandler(orderSvc)
+	lis, err := net.Listen("tcp", fmt.Sprintf(":%s", port))
+	if err != nil {
+		log.Fatalf("failed to listen: %v", err)
+	}
 
-	app := fiber.New()
-	app.Use(cors.New())
+	grpcServer := grpc.NewServer()
+	orderPB.RegisterOrderServiceServer(grpcServer, orderHandler)
+	reflection.Register(grpcServer)
 
-	// Tambahkan endpoint Health Check
-	app.Get("/healthz", func(c *fiber.Ctx) error {
-		return c.Status(fiber.StatusOK).JSON(fiber.Map{
-			"status":  "ok",
-			"service": "order-service",
-		})
-	})
-
-	api := app.Group("/api/v1")
-
-	orderRoutes := api.Group("/orders")
-	orderRoutes.Post("", orderHandler.CreateOrder)
-	orderRoutes.Get("/my", orderHandler.GetMyOrders)
-
-	appLogger.Info("Order Service is starting on port 8084")
-	if err := app.Listen(":8084"); err != nil {
-		appLogger.Fatal("Failed to start server", zap.Error(err))
+	log.Printf("Order gRPC server listening on port %s", port)
+	if err := grpcServer.Serve(lis); err != nil {
+		log.Fatalf("failed to serve gRPC: %v", err)
 	}
 }

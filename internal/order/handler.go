@@ -1,50 +1,63 @@
-// internal/order/handler.go
 package order
 
 import (
-	"fnb-system/pkg/dto"
+	"context"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/ryannovarypradana/fnb-microservice-api/pkg/grpc/protoc/order"
+	"github.com/ryannovarypradana/fnb-microservice-api/pkg/model"
 )
 
-type OrderHandler struct {
-	service OrderService
+type GRPCHandler struct {
+	order.UnimplementedOrderServiceServer
+	service Service
 }
 
-func NewOrderHandler(service OrderService) *OrderHandler {
-	return &OrderHandler{service}
+func NewGRPCHandler(s Service) *GRPCHandler {
+	return &GRPCHandler{service: s}
 }
 
-func (h *OrderHandler) CreateOrder(c *fiber.Ctx) error {
-	var req dto.CreateOrderRequest
-	if err := c.BodyParser(&req); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Cannot parse JSON"})
-	}
-
-	// Ambil userID dari context yang di-set oleh AuthMiddleware
-	userID, ok := c.Locals("user_id").(uint)
-	if !ok {
-		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Invalid user ID in token"})
-	}
-
-	order, err := h.service.CreateOrder(userID, req)
+func (h *GRPCHandler) CreateOrder(ctx context.Context, req *order.CreateOrderRequest) (*order.CreateOrderResponse, error) {
+	o, err := h.service.CreateOrder(ctx, req)
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+		return nil, err
 	}
-
-	return c.Status(fiber.StatusCreated).JSON(order)
+	return &order.CreateOrderResponse{Order: modelToProto(o)}, nil
 }
 
-func (h *OrderHandler) GetMyOrders(c *fiber.Ctx) error {
-	userID, ok := c.Locals("user_id").(uint)
-	if !ok {
-		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Invalid user ID in token"})
-	}
-
-	orders, err := h.service.GetMyOrders(userID)
+func (h *GRPCHandler) GetOrderById(ctx context.Context, req *order.GetOrderByIdRequest) (*order.GetOrderByIdResponse, error) {
+	o, err := h.service.GetOrderByID(ctx, req.GetId())
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+		return nil, err
 	}
+	return &order.GetOrderByIdResponse{Order: modelToProto(o)}, nil
+}
 
-	return c.Status(fiber.StatusOK).JSON(orders)
+func (h *GRPCHandler) GetAllOrders(ctx context.Context, req *order.GetAllOrdersRequest) (*order.GetAllOrdersResponse, error) {
+	orders, err := h.service.GetAllOrdersByUserID(ctx, req.GetUserId())
+	if err != nil {
+		return nil, err
+	}
+	var orderMessages []*order.Order
+	for _, o := range orders {
+		orderMessages = append(orderMessages, modelToProto(o))
+	}
+	return &order.GetAllOrdersResponse{Orders: orderMessages}, nil
+}
+
+// Helper function to convert internal model to proto message
+func modelToProto(o *model.Order) *order.Order {
+	var items []*order.OrderItem
+	for _, item := range o.Items {
+		items = append(items, &order.OrderItem{
+			ProductId: item.ProductID.String(),
+			Quantity:  int32(item.Quantity),
+		})
+	}
+	return &order.Order{
+		Id:         o.ID.String(),
+		UserId:     o.UserID.String(),
+		Status:     o.Status,
+		TotalPrice: o.TotalPrice,
+		Items:      items,
+	}
 }

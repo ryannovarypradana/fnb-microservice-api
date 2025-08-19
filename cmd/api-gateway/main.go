@@ -1,62 +1,57 @@
+// /cmd/api-gateway/main.go
 package main
 
 import (
-	"fnb-system/pkg/logger"
-	"fnb-system/pkg/middleware"
 	"log"
 	"os"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
-	"github.com/gofiber/fiber/v2/middleware/proxy"
+	"github.com/gofiber/fiber/v2/middleware/logger"
 	"github.com/joho/godotenv"
-	"go.uber.org/zap"
+	"github.com/ryannovarypradana/fnb-microservice-api/pkg/grpc/client"
+	"github.com/ryannovarypradana/fnb-microservice-api/pkg/grpc/handler"
+	"github.com/ryannovarypradana/fnb-microservice-api/pkg/middleware"
+	"github.com/ryannovarypradana/fnb-microservice-api/pkg/model"
 )
 
 func main() {
 	if err := godotenv.Load(); err != nil {
-		log.Println("Warning: .env file not found")
+		log.Println("No .env file found.")
 	}
-
-	appLogger := logger.New()
-	defer appLogger.Sync()
 
 	app := fiber.New()
+	app.Use(logger.New())
 	app.Use(cors.New())
 
-	// Tambahkan endpoint Health Check
-	app.Get("/healthz", func(c *fiber.Ctx) error {
-		return c.Status(fiber.StatusOK).JSON(fiber.Map{
-			"status":  "ok",
-			"service": "api-gateway",
-		})
-	})
+	// === Initialize gRPC Clients ===
+	authClient := client.NewAuthClient()
+	userClient := client.NewUserClient()
+	// ... other clients
 
-	authServiceAddr := os.Getenv("AUTH_SERVICE_ADDR")
-	userServiceAddr := os.Getenv("USER_SERVICE_ADDR")
-	productServiceAddr := os.Getenv("PRODUCT_SERVICE_ADDR")
-	orderServiceAddr := os.Getenv("ORDER_SERVICE_ADDR")
+	// === Initialize Handlers ===
+	authHandler := handler.NewAuthHandler(authClient)
+	// FIX: Initialize the userHandler using the userClient
+	userHandler := handler.NewUserHandler(userClient)
+	// ... other handlers
 
-	api := app.Group("/api/v1")
+	// === Setup Routes ===
+	api := app.Group("/api")
 
-	// Rute Publik
-	api.Post("/register", proxy.Forward(authServiceAddr+"/api/v1/register"))
-	api.Post("/login", proxy.Forward(authServiceAddr+"/api/v1/login"))
-	api.Get("/menus", proxy.Forward(productServiceAddr+"/api/v1/menus"))
-	api.Get("/categories", proxy.Forward(productServiceAddr+"/api/v1/categories"))
+	// --- Public Routes ---
+	api.Post("/auth/register", authHandler.Register)
+	api.Post("/auth/login", authHandler.Login)
 
-	// Rute Terproteksi
-	api.Use(middleware.AuthMiddleware)
+	// --- Authenticated Routes ---
+	authRequired := api.Group("", middleware.AuthMiddleware)
 
-	api.Get("/users", proxy.Forward(userServiceAddr+"/api/v1/users"))
-	api.Get("/users/:id", proxy.Forward(userServiceAddr+"/api/v1/users/:id"))
-	api.Post("/orders", proxy.Forward(orderServiceAddr+"/api/v1/orders"))
-	api.Get("/orders/my", proxy.Forward(orderServiceAddr+"/api/v1/orders/my"))
-	api.Post("/menus", proxy.Forward(productServiceAddr+"/api/v1/menus"))
-	api.Post("/categories", proxy.Forward(productServiceAddr+"/api/v1/categories"))
+	// FIX: Use the initialized userHandler and the correct Role constant
+	authRequired.Get("/users/:id", middleware.RoleMiddleware(model.RoleSuperAdmin), userHandler.GetUser)
 
-	appLogger.Info("API Gateway is starting on port 8080")
-	if err := app.Listen(":8080"); err != nil {
-		appLogger.Fatal("Failed to start API Gateway", zap.Error(err))
+	// === Start Server ===
+	port := os.Getenv("API_GATEWAY_PORT")
+	if port == "" {
+		port = "3000"
 	}
+	log.Fatal(app.Listen(":" + port))
 }

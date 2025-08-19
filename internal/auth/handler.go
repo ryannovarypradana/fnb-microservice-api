@@ -1,67 +1,48 @@
+// /internal/auth/handler.go
 package auth
 
 import (
-	"fnb-system/pkg/dto"
+	"context"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/ryannovarypradana/fnb-microservice-api/pkg/grpc/protoc/auth"
+	"github.com/ryannovarypradana/fnb-microservice-api/pkg/model"
 )
 
-type AuthHandler struct {
-	authService AuthService
+type GRPCHandler struct {
+	auth.UnimplementedAuthServiceServer
+	service Service
 }
 
-func NewAuthHandler(authService AuthService) *AuthHandler {
-	return &AuthHandler{authService}
+func NewGRPCHandler(s Service) *GRPCHandler {
+	return &GRPCHandler{service: s}
 }
 
-// Register menangani request registrasi user.
-func (h *AuthHandler) Register(c *fiber.Ctx) error {
-	var req dto.AuthRegisterRequest
-	if err := c.BodyParser(&req); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "Cannot parse JSON",
-		})
-	}
-
-	// Anda bisa menambahkan validasi request di sini
-
-	user, err := h.authService.Register(req)
+func (h *GRPCHandler) Login(ctx context.Context, req *auth.LoginRequest) (*auth.LoginResponse, error) {
+	token, err := h.service.Login(ctx, req.GetEmail(), req.GetPassword())
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": err.Error(),
-		})
+		return nil, err
 	}
-
-	// Buat response DTO agar tidak mengirim password hash
-	response := dto.UserResponse{
-		ID:    user.ID,
-		Name:  user.Name,
-		Email: user.Email,
-		Role:  user.Role,
-	}
-
-	return c.Status(fiber.StatusCreated).JSON(response)
+	return &auth.LoginResponse{Token: token}, nil
 }
 
-// Login menangani request login.
-func (h *AuthHandler) Login(c *fiber.Ctx) error {
-	var req dto.AuthLoginRequest
-	if err := c.BodyParser(&req); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "Cannot parse JSON",
-		})
+func (h *GRPCHandler) Register(ctx context.Context, req *auth.RegisterRequest) (*auth.RegisterResponse, error) {
+	user := &model.User{
+		Name:     req.GetName(),
+		Email:    req.GetEmail(),
+		Password: req.GetPassword(),
 	}
 
-	// Anda bisa menambahkan validasi request di sini
-
-	token, err := h.authService.Login(req.Email, req.Password)
+	createdUser, err := h.service.Register(ctx, user)
 	if err != nil {
-		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
-			"error": "Invalid credentials",
-		})
+		return nil, err
 	}
 
-	return c.Status(fiber.StatusOK).JSON(fiber.Map{
-		"token": token,
-	})
+	return &auth.RegisterResponse{
+		User: &auth.User{
+			Id:    createdUser.ID.String(),
+			Name:  createdUser.Name,
+			Email: createdUser.Email,
+			Role:  createdUser.Role,
+		},
+	}, nil
 }

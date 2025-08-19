@@ -1,122 +1,86 @@
+// /internal/auth/service.go
 package auth
 
 import (
+	"context"
 	"errors"
-	"fnb-system/pkg/dto"
-	"fnb-system/pkg/model"
 	"os"
 	"time"
 
-	"github.com/golang-jwt/jwt/v5"
+	"github.com/ryannovarypradana/fnb-microservice-api/pkg/model"
+
+	"github.com/golang-jwt/jwt/v4"
 	"golang.org/x/crypto/bcrypt"
+	"gorm.io/gorm"
 )
 
-// --- Interface (Kontrak) ---
-type AuthService interface {
-	Register(req dto.AuthRegisterRequest) (*model.User, error)
-	Login(email, password string) (string, error)
+type Service interface {
+	Login(ctx context.Context, email, password string) (string, error)
+	Register(ctx context.Context, user *model.User) (*model.User, error)
 }
 
-// Dependensi yang dibutuhkan oleh AuthService
-type AuthRepository interface {
-	CreateUser(user *model.User) (*model.User, error)
-}
-type UserRepository interface {
-	FindByEmail(email string) (*model.User, error)
-}
-
-// --- Implementation ---
 type authService struct {
-	authRepository AuthRepository
-	userRepository UserRepository
+	repo Repository
+	db   *gorm.DB
 }
 
-// NewAuthService membuat instance baru dari authService.
-func NewAuthService(authRepo AuthRepository, userRepo UserRepository) AuthService {
-	return &authService{
-		authRepository: authRepo,
-		userRepository: userRepo,
-	}
+func NewService(repo Repository, db *gorm.DB) Service {
+	return &authService{repo: repo, db: db}
 }
 
-func (s *authService) Register(req dto.AuthRegisterRequest) (*model.User, error) {
-	// Hash password
-	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
+func (s *authService) Login(ctx context.Context, email, password string) (string, error) {
+	user, err := s.repo.FindUserByEmail(ctx, email)
 	if err != nil {
-		return nil, err
+		return "", errors.New("invalid credentials")
 	}
 
-	newUser := model.User{
-		Name:     req.Name,
-		Email:    req.Email,
-		Password: string(hashedPassword),
-		Role:     "user", // Default role
+	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(password)); err != nil {
+		return "", errors.New("invalid credentials")
 	}
 
-	createdUser, err := s.authRepository.CreateUser(&newUser)
-	if err != nil {
-		return nil, err
+	claims := jwt.MapClaims{
+		"id":    user.ID,
+		"email": user.Email,
+		"role":  user.Role,
+		"exp":   time.Now().Add(time.Hour * 72).Unix(),
 	}
-
-	return createdUser, nil
-}
-
-func (s *authService) Login(email, password string) (string, error) {
-	user, err := s.userRepository.FindByEmail(email)
-	if err != nil {
-		return "", errors.New("user not found")
+	// Sisipkan ID perusahaan & toko jika ada
+	if user.CompanyID != nil {
+		claims["company_id"] = user.CompanyID.String()
 	}
-
-	// Bandingkan password yang diinput dengan hash di database
-	err = bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(password))
-	if err != nil {
-		return "", errors.New("invalid password")
-	}
-
-	// Jika berhasil, generate token
-	return GenerateToken(user)
-}
-
-// --- JWT Helper Functions ---
-
-// Claims mendefinisikan data yang akan disimpan di dalam token.
-type Claims struct {
-	UserID uint   `json:"user_id"`
-	Role   string `json:"role"`
-	jwt.RegisteredClaims
-}
-
-var jwtSecret = []byte(os.Getenv("JWT_SECRET"))
-
-// GenerateToken membuat token JWT baru untuk user.
-func GenerateToken(user *model.User) (string, error) {
-	expirationTime := time.Now().Add(24 * time.Hour)
-	claims := &Claims{
-		UserID: user.ID,
-		Role:   user.Role,
-		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(expirationTime),
-		},
+	if user.StoreID != nil {
+		claims["store_id"] = user.StoreID.String()
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	return token.SignedString(jwtSecret)
+	jwtSecret := os.Getenv("JWT_SECRET")
+	tokenString, err := token.SignedString([]byte(jwtSecret))
+	if err != nil {
+		return "", err
+	}
+
+	return tokenString, nil
 }
 
-// ValidateToken memverifikasi token string dan mengembalikan claims jika valid.
-func ValidateToken(tokenString string) (*Claims, error) {
-	claims := &Claims{}
-	token, err := jwt.ParseWithClaims(tokenString, claims, func(token *jwt.Token) (interface{}, error) {
-		return jwtSecret, nil
-	})
-
+func (s *authService) Register(ctx context.Context, user *model.User) (*model.User, error) {
+	// Hash password
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(user.Password), bcrypt.DefaultCost)
 	if err != nil {
 		return nil, err
 	}
+	user.Password = string(hashedPassword)
 
-	if !token.Valid {
-		return nil, errors.New("invalid token")
+	// Set default role jika kosong
+	if user.Role == "" {
+		user.Role = model.RoleCustomer
 	}
 
-	return claims, nil
+	// Create user
+	if err := s.repo.CreateUser(ctx, nil, user); err != nil {
+		return nil, err
+	}
+
+	// Menghapus password dari response
+	user.Password = ""
+	return user, nil
 }

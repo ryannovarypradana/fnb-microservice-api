@@ -1,111 +1,61 @@
-// internal/product/repository.go
 package product
 
 import (
 	"context"
-	"encoding/json"
-	"fnb-system/pkg/model"
-	"time"
+	"fmt"
 
-	"github.com/go-redis/redis/v8"
+	"github.com/google/uuid"
+	"github.com/ryannovarypradana/fnb-microservice-api/pkg/model"
 	"gorm.io/gorm"
 )
 
-const (
-	// Definisikan kunci cache sebagai konstanta agar tidak ada typo.
-	cacheKeyAllMenus = "menus:all"
-)
-
-// ProductRepository mendefinisikan kontrak untuk operasi data produk.
-type ProductRepository interface {
-	// Category methods
-	CreateCategory(category *model.Category) (*model.Category, error)
-	FindAllCategories() (*[]model.Category, error)
-
-	// Menu methods
-	CreateMenu(menu *model.Menu) (*model.Menu, error)
-	FindAllMenus() (*[]model.Menu, error)
-	FindMenuByID(id uint) (*model.Menu, error)
+type Repository interface {
+	Create(ctx context.Context, product *model.Product) error
+	FindByID(ctx context.Context, id uuid.UUID) (*model.Product, error)
+	FindAll(ctx context.Context, search, storeID string) ([]*model.Product, error)
+	Update(ctx context.Context, product *model.Product) error
+	Delete(ctx context.Context, id uuid.UUID) error
 }
 
-// productRepository adalah implementasi konkret dengan koneksi DB dan Redis.
 type productRepository struct {
-	db  *gorm.DB
-	rdb *redis.Client
-	ctx context.Context
+	db *gorm.DB
 }
 
-// NewProductRepository membuat instance baru dari productRepository.
-func NewProductRepository(db *gorm.DB, rdb *redis.Client) ProductRepository {
-	return &productRepository{
-		db:  db,
-		rdb: rdb,
-		ctx: context.Background(),
-	}
+func NewRepository(db *gorm.DB) Repository {
+	return &productRepository{db: db}
 }
 
-// --- Category Implementations ---
+func (r *productRepository) Create(ctx context.Context, product *model.Product) error {
+	return r.db.WithContext(ctx).Create(product).Error
+}
 
-func (r *productRepository) CreateCategory(category *model.Category) (*model.Category, error) {
-	if err := r.db.Create(category).Error; err != nil {
+func (r *productRepository) FindByID(ctx context.Context, id uuid.UUID) (*model.Product, error) {
+	var product model.Product
+	if err := r.db.WithContext(ctx).First(&product, "id = ?", id).Error; err != nil {
 		return nil, err
 	}
-	return category, nil
+	return &product, nil
 }
 
-func (r *productRepository) FindAllCategories() (*[]model.Category, error) {
-	var categories []model.Category
-	if err := r.db.Find(&categories).Error; err != nil {
+func (r *productRepository) FindAll(ctx context.Context, search, storeID string) ([]*model.Product, error) {
+	var products []*model.Product
+	query := r.db.WithContext(ctx)
+	if search != "" {
+		query = query.Where("name ILIKE ?", fmt.Sprintf("%%%s%%", search))
+	}
+	if storeID != "" {
+		query = query.Where("store_id = ?", storeID)
+	}
+	if err := query.Find(&products).Error; err != nil {
 		return nil, err
 	}
-	return &categories, nil
+	return products, nil
 }
 
-// --- Menu Implementations ---
-
-// CreateMenu menyimpan menu baru dan menghapus cache yang sudah ada.
-func (r *productRepository) CreateMenu(menu *model.Menu) (*model.Menu, error) {
-	if err := r.db.Create(menu).Error; err != nil {
-		return nil, err
-	}
-	// Invalidate cache karena data telah berubah.
-	r.rdb.Del(r.ctx, cacheKeyAllMenus)
-	return menu, nil
+func (r *productRepository) Update(ctx context.Context, product *model.Product) error {
+	return r.db.WithContext(ctx).Save(product).Error
 }
 
-// FindAllMenus menerapkan pola cache-aside.
-func (r *productRepository) FindAllMenus() (*[]model.Menu, error) {
-	// 1. Coba ambil dari Redis terlebih dahulu.
-	val, err := r.rdb.Get(r.ctx, cacheKeyAllMenus).Result()
-	if err == nil {
-		// Cache hit! Deserialisasi JSON dari Redis ke struct.
-		var menus []model.Menu
-		if json.Unmarshal([]byte(val), &menus) == nil {
-			return &menus, nil
-		}
-	}
-
-	// 2. Cache miss. Ambil dari database.
-	var menus []model.Menu
-	if err := r.db.Preload("Category").Find(&menus).Error; err != nil {
-		return nil, err
-	}
-
-	// 3. Simpan hasil ke Redis untuk permintaan selanjutnya.
-	jsonData, err := json.Marshal(menus)
-	if err == nil {
-		// Set cache dengan waktu kadaluarsa 10 menit.
-		r.rdb.Set(r.ctx, cacheKeyAllMenus, jsonData, 10*time.Minute)
-	}
-
-	return &menus, nil
-}
-
-// FindMenuByID mencari satu menu. Caching bisa ditambahkan di sini juga jika diperlukan.
-func (r *productRepository) FindMenuByID(id uint) (*model.Menu, error) {
-	var menu model.Menu
-	if err := r.db.Preload("Category").First(&menu, id).Error; err != nil {
-		return nil, err
-	}
-	return &menu, nil
+func (r *productRepository) Delete(ctx context.Context, id uuid.UUID) error {
+	return r.db.WithContext(ctx).Delete(&model.Product{}, "id = ?", id).Error
 }

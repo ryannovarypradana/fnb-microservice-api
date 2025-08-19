@@ -1,89 +1,45 @@
-// internal/user/handler.go
 package user
 
 import (
-	"fnb-system/pkg/dto"
-	"strconv"
+	"context"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/ryannovarypradana/fnb-microservice-api/pkg/grpc/protoc/user"
 )
 
-type UserHandler struct {
-	userService UserService
+type GRPCHandler struct {
+	user.UnimplementedUserServiceServer // Penting untuk forward compatibility
+	service                             Service
 }
 
-func NewUserHandler(userService UserService) *UserHandler {
-	return &UserHandler{userService}
+func NewGRPCHandler(s Service) *GRPCHandler {
+	return &GRPCHandler{service: s}
 }
 
-// GetAllUsers menangani request untuk mendapatkan semua pengguna.
-func (h *UserHandler) GetAllUsers(c *fiber.Ctx) error {
-	// Setup paginasi dari query params
-	pagination := dto.Pagination{
-		Limit: 10,
-		Page:  1,
-		Sort:  "id asc",
-	} // Anda bisa menambahkan logika untuk mengambil nilai ini dari c.Query()
-
-	users, err := h.userService.GetAll(&pagination)
+// GetUser adalah implementasi dari RPC GetUser yang ada di user.proto
+func (h *GRPCHandler) GetUser(ctx context.Context, req *user.GetUserRequest) (*user.GetUserResponse, error) {
+	foundUser, err := h.service.GetUserByID(ctx, req.GetId())
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "Could not retrieve users",
-		})
+		return nil, err
 	}
 
-	return c.Status(fiber.StatusOK).JSON(users)
+	// Terjemahkan model internal ke response message protobuf
+	res := &user.GetUserResponse{
+		User: &user.User{
+			Id:    foundUser.ID.String(),
+			Name:  foundUser.Name,
+			Email: foundUser.Email,
+			Role:  foundUser.Role,
+		},
+	}
+
+	if foundUser.CompanyID != nil {
+		res.User.CompanyId = foundUser.CompanyID.String()
+	}
+	if foundUser.StoreID != nil {
+		res.User.StoreId = foundUser.StoreID.String()
+	}
+
+	return res, nil
 }
 
-// GetUserByID menangani request untuk mendapatkan satu pengguna.
-func (h *UserHandler) GetUserByID(c *fiber.Ctx) error {
-	// Ambil ID dari parameter URL dan konversi ke integer
-	id, err := strconv.Atoi(c.Params("id"))
-	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid ID format"})
-	}
-
-	user, err := h.userService.GetByID(uint(id))
-	if err != nil {
-		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "User not found"})
-	}
-
-	return c.Status(fiber.StatusOK).JSON(user)
-}
-
-// UpdateUser menangani request untuk memperbarui pengguna.
-func (h *UserHandler) UpdateUser(c *fiber.Ctx) error {
-	id, err := strconv.Atoi(c.Params("id"))
-	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid ID format"})
-	}
-
-	var req dto.UserUpdateRequest
-	if err := c.BodyParser(&req); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Cannot parse JSON"})
-	}
-
-	// Anda bisa menambahkan validasi DTO di sini
-
-	user, err := h.userService.Update(uint(id), req)
-	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
-	}
-
-	return c.Status(fiber.StatusOK).JSON(user)
-}
-
-// DeleteUser menangani request untuk menghapus pengguna.
-func (h *UserHandler) DeleteUser(c *fiber.Ctx) error {
-	id, err := strconv.Atoi(c.Params("id"))
-	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid ID format"})
-	}
-
-	err = h.userService.Delete(uint(id))
-	if err != nil {
-		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": err.Error()})
-	}
-
-	return c.SendStatus(fiber.StatusNoContent) // 204 No Content untuk delete sukses
-}
+// Implementasikan RPC lain dari user.proto di sini...

@@ -1,65 +1,56 @@
 package main
 
 import (
-	"fnb-system/internal/product"
-	"fnb-system/pkg/database"
-	"fnb-system/pkg/logger"
-	"fnb-system/pkg/redis"
+	"fmt"
 	"log"
+	"net"
 	"os"
 
-	"github.com/gofiber/fiber/v2"
-	"github.com/gofiber/fiber/v2/middleware/cors"
-	"github.com/joho/godotenv"
-	"go.uber.org/zap"
+	internalProduct "github.com/ryannovarypradana/fnb-microservice-api/internal/product"
+	"github.com/ryannovarypradana/fnb-microservice-api/pkg/database"
+	"github.com/ryannovarypradana/fnb-microservice-api/pkg/grpc/client" // <-- Import paket client
+	productPB "github.com/ryannovarypradana/fnb-microservice-api/pkg/grpc/protoc/product"
+	"github.com/ryannovarypradana/fnb-microservice-api/pkg/model"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/reflection"
 )
 
 func main() {
-	if err := godotenv.Load(); err != nil {
-		log.Println("Warning: .env file not found")
-	}
-
-	appLogger := logger.New()
-	defer appLogger.Sync()
+	log.Println("Starting Product Service...")
 
 	db, err := database.NewPostgresConnection()
 	if err != nil {
-		appLogger.Fatal("Failed to connect to database", zap.Error(err))
+		log.Fatalf("failed to connect to database: %v", err)
 	}
 
-	redisAddr := os.Getenv("REDIS_ADDR")
-	if redisAddr == "" {
-		redisAddr = "localhost:6379"
+	if err := db.AutoMigrate(&model.Product{}); err != nil {
+		log.Fatalf("failed to migrate database: %v", err)
 	}
-	rdb := redis.NewRedisClient(redisAddr)
 
-	productRepo := product.NewProductRepository(db, rdb)
-	productSvc := product.NewProductService(productRepo)
-	productHandler := product.NewProductHandler(productSvc)
+	// 1. Inisialisasi gRPC client untuk store-service
+	storeClient := client.NewStoreClient()
 
-	app := fiber.New()
-	app.Use(cors.New())
+	// 2. Suntikkan (inject) storeClient ke dalam productService
+	productRepo := internalProduct.NewRepository(db)
+	productService := internalProduct.NewService(productRepo, storeClient) // <-- Diperbarui
+	productHandler := internalProduct.NewGRPCHandler(productService)
 
-	// Tambahkan endpoint Health Check
-	app.Get("/healthz", func(c *fiber.Ctx) error {
-		return c.Status(fiber.StatusOK).JSON(fiber.Map{
-			"status":  "ok",
-			"service": "product-service",
-		})
-	})
+	port := os.Getenv("PRODUCT_SERVICE_PORT")
+	if port == "" {
+		port = "50053"
+	}
 
-	api := app.Group("/api/v1")
+	lis, err := net.Listen("tcp", fmt.Sprintf(":%s", port))
+	if err != nil {
+		log.Fatalf("failed to listen: %v", err)
+	}
 
-	api.Get("/categories", productHandler.GetAllCategories)
-	api.Get("/menus", productHandler.GetAllMenus)
-	api.Get("/menus/:id", productHandler.GetMenuByID)
+	grpcServer := grpc.NewServer()
+	productPB.RegisterProductServiceServer(grpcServer, productHandler)
+	reflection.Register(grpcServer)
 
-	adminRoutes := api.Group("/")
-	adminRoutes.Post("/categories", productHandler.CreateCategory)
-	adminRoutes.Post("/menus", productHandler.CreateMenu)
-
-	appLogger.Info("Product Service is starting on port 8083")
-	if err := app.Listen(":8083"); err != nil {
-		appLogger.Fatal("Failed to start server", zap.Error(err))
+	log.Printf("Product gRPC server listening on port %s", port)
+	if err := grpcServer.Serve(lis); err != nil {
+		log.Fatalf("failed to serve gRPC: %v", err)
 	}
 }
