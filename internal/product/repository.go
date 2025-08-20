@@ -1,61 +1,92 @@
 package product
 
 import (
-	"context"
-	"fmt"
-
-	"github.com/google/uuid"
 	"github.com/ryannovarypradana/fnb-microservice-api/pkg/model"
 	"gorm.io/gorm"
 )
 
-type Repository interface {
-	Create(ctx context.Context, product *model.Product) error
-	FindByID(ctx context.Context, id uuid.UUID) (*model.Product, error)
-	FindAll(ctx context.Context, search, storeID string) ([]*model.Product, error)
-	Update(ctx context.Context, product *model.Product) error
-	Delete(ctx context.Context, id uuid.UUID) error
+type IRepository interface {
+	// Menu operations
+	CreateMenu(menu *model.Menu) error
+	GetMenuByID(menuID uint) (*model.Menu, error)
+	UpdateMenu(menu *model.Menu) error
+	DeleteMenu(menuID uint) error
+	FindMenusByStoreID(storeID uint) ([]*model.Menu, error)
+
+	// Category operations
+	CreateCategory(category *model.Category) error
+	GetCategoryByID(categoryID uint) (*model.Category, error)
+	UpdateCategory(category *model.Category) error
+	DeleteCategory(categoryID uint) error
+	FindCategoriesByStoreID(storeID uint) ([]*model.Category, error)
 }
 
-type productRepository struct {
+type Repository struct {
 	db *gorm.DB
 }
 
-func NewRepository(db *gorm.DB) Repository {
-	return &productRepository{db: db}
+func NewProductRepository(db *gorm.DB) IRepository {
+	return &Repository{db: db}
 }
 
-func (r *productRepository) Create(ctx context.Context, product *model.Product) error {
-	return r.db.WithContext(ctx).Create(product).Error
+// --- Menu Implementations ---
+
+func (r *Repository) CreateMenu(menu *model.Menu) error {
+	return r.db.Create(menu).Error
 }
 
-func (r *productRepository) FindByID(ctx context.Context, id uuid.UUID) (*model.Product, error) {
-	var product model.Product
-	if err := r.db.WithContext(ctx).First(&product, "id = ?", id).Error; err != nil {
+func (r *Repository) GetMenuByID(menuID uint) (*model.Menu, error) {
+	var menu model.Menu
+	if err := r.db.Preload("Category").First(&menu, menuID).Error; err != nil {
 		return nil, err
 	}
-	return &product, nil
+	return &menu, nil
 }
 
-func (r *productRepository) FindAll(ctx context.Context, search, storeID string) ([]*model.Product, error) {
-	var products []*model.Product
-	query := r.db.WithContext(ctx)
-	if search != "" {
-		query = query.Where("name ILIKE ?", fmt.Sprintf("%%%s%%", search))
-	}
-	if storeID != "" {
-		query = query.Where("store_id = ?", storeID)
-	}
-	if err := query.Find(&products).Error; err != nil {
+func (r *Repository) UpdateMenu(menu *model.Menu) error {
+	return r.db.Save(menu).Error
+}
+
+func (r *Repository) DeleteMenu(menuID uint) error {
+	return r.db.Delete(&model.Menu{}, menuID).Error
+}
+
+func (r *Repository) FindMenusByStoreID(storeID uint) ([]*model.Menu, error) {
+	var menus []*model.Menu
+	err := r.db.Preload("Category").Where("store_id = ?", storeID).Find(&menus).Error
+	return menus, err
+}
+
+// --- Category Implementations ---
+
+func (r *Repository) CreateCategory(category *model.Category) error {
+	return r.db.Create(category).Error
+}
+
+func (r *Repository) GetCategoryByID(categoryID uint) (*model.Category, error) {
+	var category model.Category
+	if err := r.db.First(&category, categoryID).Error; err != nil {
 		return nil, err
 	}
-	return products, nil
+	return &category, nil
 }
 
-func (r *productRepository) Update(ctx context.Context, product *model.Product) error {
-	return r.db.WithContext(ctx).Save(product).Error
+func (r *Repository) UpdateCategory(category *model.Category) error {
+	return r.db.Save(category).Error
 }
 
-func (r *productRepository) Delete(ctx context.Context, id uuid.UUID) error {
-	return r.db.WithContext(ctx).Delete(&model.Product{}, "id = ?", id).Error
+func (r *Repository) DeleteCategory(categoryID uint) error {
+	// Pastikan tidak ada menu yang terhubung sebelum menghapus
+	var count int64
+	r.db.Model(&model.Menu{}).Where("category_id = ?", categoryID).Count(&count)
+	if count > 0 {
+		return gorm.ErrForeignKeyViolated
+	}
+	return r.db.Delete(&model.Category{}, categoryID).Error
+}
+
+func (r *Repository) FindCategoriesByStoreID(storeID uint) ([]*model.Category, error) {
+	var categories []*model.Category
+	err := r.db.Where("store_id = ?", storeID).Find(&categories).Error
+	return categories, err
 }

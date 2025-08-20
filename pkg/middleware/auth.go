@@ -8,7 +8,7 @@ import (
 	"github.com/ryannovarypradana/fnb-microservice-api/pkg/model" // Pastikan pkg/model/role.go sudah dibuat
 
 	"github.com/gofiber/fiber/v2"
-	"github.com/golang-jwt/jwt/v4"
+	"github.com/golang-jwt/jwt/v5"
 )
 
 // AuthMiddleware memeriksa validitas token JWT dari header Authorization.
@@ -108,4 +108,11 @@ func IsCompanyOwnerOrSuperAdmin() fiber.Handler {
 
 		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "Forbidden: You do not own this resource"})
 	}
+}
+
+type JWTClaims struct {
+	UserID    string `json:"user_id"`
+	Role      string `json:"role"`
+	CompanyID string `json:"company_id,omitempty"`
+	jwt.RegisteredClaims
 }

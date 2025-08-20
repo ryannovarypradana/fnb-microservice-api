@@ -1,64 +1,53 @@
 package main
 
 import (
-	"fmt"
 	"log"
 	"net"
 	"os"
 
-	internalOrder "github.com/ryannovarypradana/fnb-microservice-api/internal/order"
-	"github.com/ryannovarypradana/fnb-microservice-api/pkg/database"
-	"github.com/ryannovarypradana/fnb-microservice-api/pkg/eventbus" // <-- Import eventbus
-	"github.com/ryannovarypradana/fnb-microservice-api/pkg/grpc/client"
-	orderPB "github.com/ryannovarypradana/fnb-microservice-api/pkg/grpc/protoc/order"
-	"github.com/ryannovarypradana/fnb-microservice-api/pkg/model"
+	"github.com/joho/godotenv"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/reflection"
+
+	"github.com/ryannovarypradana/fnb-microservice-api/config"
+	"github.com/ryannovarypradana/fnb-microservice-api/internal/order"
+	"github.com/ryannovarypradana/fnb-microservice-api/pkg/database"
+	"github.com/ryannovarypradana/fnb-microservice-api/pkg/grpc/client"
+	pb "github.com/ryannovarypradana/fnb-microservice-api/pkg/grpc/protoc/order"
+	"github.com/ryannovarypradana/fnb-microservice-api/pkg/logger"
+	"github.com/ryannovarypradana/fnb-microservice-api/pkg/model"
 )
 
 func main() {
-	log.Println("Starting Order Service...")
+	if os.Getenv("APP_ENV") != "production" {
+		err := godotenv.Load()
+		if err != nil {
+			log.Fatalf("Error loading .env file: %v", err)
+		}
+	}
 
-	db, err := database.NewPostgresConnection()
+	cfg := config.Get()
+	db, err := database.NewPostgres(cfg)
 	if err != nil {
-		log.Fatalf("failed to connect to database: %v", err)
+		log.Fatalf("Error connecting to database: %v", err)
 	}
+	db.AutoMigrate(&model.Order{}, &model.OrderItem{})
+	logger.InitLogger()
 
-	if err := db.AutoMigrate(&model.Order{}, &model.OrderItem{}); err != nil {
-		log.Fatalf("failed to migrate database: %v", err)
-	}
-
-	productClient := client.NewProductClient()
-
-	// Inisialisasi RabbitMQ Publisher
-	rabbitMQURL := os.Getenv("RABBITMQ_URL")
-	publisher, err := eventbus.NewRabbitMQPublisher(rabbitMQURL)
+	lis, err := net.Listen("tcp", ":"+cfg.Order.Port)
 	if err != nil {
-		log.Fatalf("gagal terhubung ke RabbitMQ: %v", err)
-	}
-	defer publisher.Close()
-
-	// Suntikkan semua dependensi
-	orderRepo := internalOrder.NewRepository(db)
-	orderService := internalOrder.NewService(orderRepo, productClient, publisher) // <-- Diperbarui
-	orderHandler := internalOrder.NewGRPCHandler(orderService)
-
-	port := os.Getenv("ORDER_SERVICE_PORT")
-	if port == "" {
-		port = "50056"
+		log.Fatalf("Failed to listen: %v", err)
 	}
 
-	lis, err := net.Listen("tcp", fmt.Sprintf(":%s", port))
-	if err != nil {
-		log.Fatalf("failed to listen: %v", err)
-	}
+	productClient := client.NewProductServiceClient(cfg.Product.Port)
+	orderRepository := order.NewOrderRepository(db)
+	orderService := order.NewOrderService(orderRepository, productClient)
+	orderGRPCHandler := order.NewOrderGRPCHandler(orderService)
 
 	grpcServer := grpc.NewServer()
-	orderPB.RegisterOrderServiceServer(grpcServer, orderHandler)
-	reflection.Register(grpcServer)
+	pb.RegisterOrderServiceServer(grpcServer, orderGRPCHandler)
 
-	log.Printf("Order gRPC server listening on port %s", port)
+	log.Printf("Order service is running on port %s", cfg.Order.Port)
 	if err := grpcServer.Serve(lis); err != nil {
-		log.Fatalf("failed to serve gRPC: %v", err)
+		log.Fatalf("Failed to serve: %v", err)
 	}
 }

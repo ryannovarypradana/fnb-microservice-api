@@ -2,100 +2,95 @@ package product
 
 import (
 	"context"
-	"errors"
 
-	"github.com/google/uuid"
-	"github.com/ryannovarypradana/fnb-microservice-api/pkg/grpc/protoc/product"
-	"github.com/ryannovarypradana/fnb-microservice-api/pkg/grpc/protoc/store" // <-- Import proto store
 	"github.com/ryannovarypradana/fnb-microservice-api/pkg/model"
 )
 
-type Service interface {
-	CreateProduct(ctx context.Context, req *product.CreateProductRequest) (*model.Product, error)
-	GetProductByID(ctx context.Context, id string) (*model.Product, error)
-	GetAllProducts(ctx context.Context, req *product.GetAllProductsRequest) ([]*model.Product, error)
-	UpdateProduct(ctx context.Context, req *product.UpdateProductRequest) (*model.Product, error)
-	DeleteProduct(ctx context.Context, id string) error
+type IService interface {
+	// Menu services
+	CreateMenu(ctx context.Context, menu *model.Menu) error
+	GetMenuByID(ctx context.Context, menuID uint) (*model.Menu, error)
+	UpdateMenu(ctx context.Context, menuID uint, updatedMenu *model.Menu) error
+	DeleteMenu(ctx context.Context, menuID uint) error
+	GetMenusByStoreID(ctx context.Context, storeID uint) ([]*model.Menu, error)
+
+	// Category services
+	CreateCategory(ctx context.Context, category *model.Category) error
+	GetCategoryByID(ctx context.Context, categoryID uint) (*model.Category, error)
+	UpdateCategory(ctx context.Context, categoryID uint, updatedCategory *model.Category) error
+	DeleteCategory(ctx context.Context, categoryID uint) error
+	GetCategoriesByStoreID(ctx context.Context, storeID uint) ([]*model.Category, error)
 }
 
-type productService struct {
-	repo        Repository
-	storeClient store.StoreServiceClient // <-- Tambahkan field untuk store client
+type Service struct {
+	repo IRepository
 }
 
-// Perbarui constructor untuk menerima storeClient
-func NewService(repo Repository, storeClient store.StoreServiceClient) Service {
-	return &productService{
-		repo:        repo,
-		storeClient: storeClient,
-	}
+func NewProductService(repo IRepository) IService {
+	return &Service{repo: repo}
 }
 
-func (s *productService) CreateProduct(ctx context.Context, req *product.CreateProductRequest) (*model.Product, error) {
-	storeUUID, err := uuid.Parse(req.GetStoreId())
-	if err != nil {
-		return nil, errors.New("invalid store id format")
-	}
+// --- Menu Service Implementations ---
 
-	// === PANGGILAN GPRC UNTUK VALIDASI TOKO ===
-	_, err = s.storeClient.GetStore(ctx, &store.GetStoreRequest{Id: req.GetStoreId()})
-	if err != nil {
-		return nil, errors.New("toko yang dituju tidak valid atau tidak ditemukan")
-	}
-	// =======================================
-
-	newProduct := &model.Product{
-		Name:        req.GetName(),
-		Description: req.GetDescription(),
-		Price:       req.GetPrice(),
-		StoreID:     storeUUID,
-	}
-
-	if err := s.repo.Create(ctx, newProduct); err != nil {
-		return nil, err
-	}
-	return newProduct, nil
+func (s *Service) CreateMenu(ctx context.Context, menu *model.Menu) error {
+	// Tambahkan validasi di sini jika perlu
+	return s.repo.CreateMenu(menu)
 }
 
-// (Sisa fungsi service lainnya tidak berubah)
-
-func (s *productService) GetProductByID(ctx context.Context, id string) (*model.Product, error) {
-	productUUID, err := uuid.Parse(id)
-	if err != nil {
-		return nil, err
-	}
-	return s.repo.FindByID(ctx, productUUID)
+func (s *Service) GetMenuByID(ctx context.Context, menuID uint) (*model.Menu, error) {
+	return s.repo.GetMenuByID(menuID)
 }
 
-func (s *productService) GetAllProducts(ctx context.Context, req *product.GetAllProductsRequest) ([]*model.Product, error) {
-	return s.repo.FindAll(ctx, req.GetSearch(), req.GetStoreId())
-}
-
-func (s *productService) UpdateProduct(ctx context.Context, req *product.UpdateProductRequest) (*model.Product, error) {
-	productUUID, err := uuid.Parse(req.GetId())
-	if err != nil {
-		return nil, err
-	}
-
-	productToUpdate, err := s.repo.FindByID(ctx, productUUID)
-	if err != nil {
-		return nil, errors.New("product not found")
-	}
-
-	productToUpdate.Name = req.GetName()
-	productToUpdate.Description = req.GetDescription()
-	productToUpdate.Price = req.GetPrice()
-
-	if err := s.repo.Update(ctx, productToUpdate); err != nil {
-		return nil, err
-	}
-	return productToUpdate, nil
-}
-
-func (s *productService) DeleteProduct(ctx context.Context, id string) error {
-	productUUID, err := uuid.Parse(id)
+func (s *Service) UpdateMenu(ctx context.Context, menuID uint, updatedMenu *model.Menu) error {
+	// Ambil data asli terlebih dahulu
+	menu, err := s.repo.GetMenuByID(menuID)
 	if err != nil {
 		return err
 	}
-	return s.repo.Delete(ctx, productUUID)
+	// Timpa dengan data baru
+	menu.Name = updatedMenu.Name
+	menu.Description = updatedMenu.Description
+	menu.Price = updatedMenu.Price
+	menu.ImageURL = updatedMenu.ImageURL
+	menu.CategoryID = updatedMenu.CategoryID
+	// StoreID tidak boleh diubah
+
+	return s.repo.UpdateMenu(menu)
+}
+
+func (s *Service) DeleteMenu(ctx context.Context, menuID uint) error {
+	return s.repo.DeleteMenu(menuID)
+}
+
+func (s *Service) GetMenusByStoreID(ctx context.Context, storeID uint) ([]*model.Menu, error) {
+	return s.repo.FindMenusByStoreID(storeID)
+}
+
+// --- Category Service Implementations ---
+
+func (s *Service) CreateCategory(ctx context.Context, category *model.Category) error {
+	return s.repo.CreateCategory(category)
+}
+
+func (s *Service) GetCategoryByID(ctx context.Context, categoryID uint) (*model.Category, error) {
+	return s.repo.GetCategoryByID(categoryID)
+}
+
+func (s *Service) UpdateCategory(ctx context.Context, categoryID uint, updatedCategory *model.Category) error {
+	category, err := s.repo.GetCategoryByID(categoryID)
+	if err != nil {
+		return err
+	}
+	category.Name = updatedCategory.Name
+	// StoreID tidak boleh diubah
+
+	return s.repo.UpdateCategory(category)
+}
+
+func (s *Service) DeleteCategory(ctx context.Context, categoryID uint) error {
+	return s.repo.DeleteCategory(categoryID)
+}
+
+func (s *Service) GetCategoriesByStoreID(ctx context.Context, storeID uint) ([]*model.Category, error) {
+	return s.repo.FindCategoriesByStoreID(storeID)
 }

@@ -3,61 +3,77 @@ package order
 import (
 	"context"
 
-	"github.com/ryannovarypradana/fnb-microservice-api/pkg/grpc/protoc/order"
+	pb "github.com/ryannovarypradana/fnb-microservice-api/pkg/grpc/protoc/order"
 	"github.com/ryannovarypradana/fnb-microservice-api/pkg/model"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
-type GRPCHandler struct {
-	order.UnimplementedOrderServiceServer
-	service Service
+type OrderGRPCHandler struct {
+	pb.UnimplementedOrderServiceServer
+	service IService
 }
 
-func NewGRPCHandler(s Service) *GRPCHandler {
-	return &GRPCHandler{service: s}
+func NewOrderGRPCHandler(service IService) *OrderGRPCHandler {
+	return &OrderGRPCHandler{service: service}
 }
 
-func (h *GRPCHandler) CreateOrder(ctx context.Context, req *order.CreateOrderRequest) (*order.CreateOrderResponse, error) {
-	o, err := h.service.CreateOrder(ctx, req)
-	if err != nil {
-		return nil, err
+func (h *OrderGRPCHandler) CreateOrder(ctx context.Context, req *pb.CreateOrderRequest) (*pb.CreateOrderResponse, error) {
+	order := &model.Order{
+		UserID:  uint(req.GetUserId()),
+		StoreID: uint(req.GetStoreId()),
 	}
-	return &order.CreateOrderResponse{Order: modelToProto(o)}, nil
-}
 
-func (h *GRPCHandler) GetOrderById(ctx context.Context, req *order.GetOrderByIdRequest) (*order.GetOrderByIdResponse, error) {
-	o, err := h.service.GetOrderByID(ctx, req.GetId())
-	if err != nil {
-		return nil, err
-	}
-	return &order.GetOrderByIdResponse{Order: modelToProto(o)}, nil
-}
-
-func (h *GRPCHandler) GetAllOrders(ctx context.Context, req *order.GetAllOrdersRequest) (*order.GetAllOrdersResponse, error) {
-	orders, err := h.service.GetAllOrdersByUserID(ctx, req.GetUserId())
-	if err != nil {
-		return nil, err
-	}
-	var orderMessages []*order.Order
-	for _, o := range orders {
-		orderMessages = append(orderMessages, modelToProto(o))
-	}
-	return &order.GetAllOrdersResponse{Orders: orderMessages}, nil
-}
-
-// Helper function to convert internal model to proto message
-func modelToProto(o *model.Order) *order.Order {
-	var items []*order.OrderItem
-	for _, item := range o.Items {
-		items = append(items, &order.OrderItem{
-			ProductId: item.ProductID.String(),
-			Quantity:  int32(item.Quantity),
+	var items []*model.OrderItem
+	for _, itemReq := range req.GetItems() {
+		items = append(items, &model.OrderItem{
+			ProductID: uint(itemReq.GetProductId()),
+			Quantity:  int(itemReq.GetQuantity()),
 		})
 	}
-	return &order.Order{
-		Id:         o.ID.String(),
-		UserId:     o.UserID.String(),
-		Status:     o.Status,
-		TotalPrice: o.TotalPrice,
-		Items:      items,
+
+	if err := h.service.CreateOrder(ctx, order, items); err != nil {
+		return nil, status.Errorf(codes.Internal, "Failed to create order: %v", err)
 	}
+
+	return &pb.CreateOrderResponse{
+		Id:          int64(order.ID),
+		Status:      order.Status,
+		TotalAmount: order.TotalAmount,
+	}, nil
+}
+
+func (h *OrderGRPCHandler) GetOrder(ctx context.Context, req *pb.GetOrderRequest) (*pb.GetOrderResponse, error) {
+	order, err := h.service.GetOrderByID(ctx, uint(req.GetId()))
+	if err != nil {
+		return nil, status.Errorf(codes.NotFound, "Order not found: %v", err)
+	}
+
+	return &pb.GetOrderResponse{
+		Id:          int64(order.ID),
+		UserId:      int64(order.UserID),
+		StoreId:     int64(order.StoreID),
+		TotalAmount: order.TotalAmount,
+		Status:      order.Status,
+	}, nil
+}
+
+func (h *OrderGRPCHandler) GetAllOrders(ctx context.Context, req *pb.GetAllOrdersRequest) (*pb.GetAllOrdersResponse, error) {
+	orders, err := h.service.GetAllOrdersByUserID(ctx, uint(req.GetUserId()))
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "Failed to get orders: %v", err)
+	}
+
+	var orderResponses []*pb.GetOrderResponse
+	for _, order := range orders {
+		orderResponses = append(orderResponses, &pb.GetOrderResponse{
+			Id:          int64(order.ID),
+			UserId:      int64(order.UserID),
+			StoreId:     int64(order.StoreID),
+			TotalAmount: order.TotalAmount,
+			Status:      order.Status,
+		})
+	}
+
+	return &pb.GetAllOrdersResponse{Orders: orderResponses}, nil
 }

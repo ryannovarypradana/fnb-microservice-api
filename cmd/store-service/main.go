@@ -6,6 +6,8 @@ import (
 	"net"
 	"os"
 
+	"github.com/joho/godotenv"
+	"github.com/ryannovarypradana/fnb-microservice-api/config"
 	internalStore "github.com/ryannovarypradana/fnb-microservice-api/internal/store"
 	"github.com/ryannovarypradana/fnb-microservice-api/pkg/database"
 	"github.com/ryannovarypradana/fnb-microservice-api/pkg/grpc/client" // <-- Import client
@@ -18,7 +20,15 @@ import (
 func main() {
 	log.Println("Starting Store Service...")
 
-	db, err := database.NewPostgresConnection()
+	if os.Getenv("APP_ENV") != "production" {
+		err := godotenv.Load()
+		if err != nil {
+			log.Fatalf("Error loading .env file: %v", err)
+		}
+	}
+	cfg := config.Get()
+	// Perbaikan di sini: Teruskan cfg ke NewPostgres
+	db, err := database.NewPostgres(cfg)
 	if err != nil {
 		log.Fatalf("failed to connect to database: %v", err)
 	}

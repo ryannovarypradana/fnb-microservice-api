@@ -8,6 +8,8 @@ import (
 	"os"
 
 	// FIX: Give the internal package a clear name, e.g., "internalCompany"
+	"github.com/joho/godotenv"
+	"github.com/ryannovarypradana/fnb-microservice-api/config"
 	internalCompany "github.com/ryannovarypradana/fnb-microservice-api/internal/company"
 
 	"github.com/ryannovarypradana/fnb-microservice-api/pkg/database"
@@ -23,7 +25,15 @@ import (
 func main() {
 	log.Println("Starting Company Service...")
 
-	db, err := database.NewPostgresConnection()
+	if os.Getenv("APP_ENV") != "production" {
+		err := godotenv.Load()
+		if err != nil {
+			log.Fatalf("Error loading .env file: %v", err)
+		}
+	}
+	cfg := config.Get()
+	// Perbaikan di sini: Teruskan cfg ke NewPostgres
+	db, err := database.NewPostgres(cfg)
 	if err != nil {
 		log.Fatalf("failed to connect to database: %v", err)
 	}

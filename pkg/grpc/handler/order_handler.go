@@ -1,77 +1,89 @@
 package handler
 
 import (
+	"strconv"
+
 	"github.com/gofiber/fiber/v2"
-	"github.com/golang-jwt/jwt/v4"
-	"github.com/ryannovarypradana/fnb-microservice-api/pkg/grpc/protoc/order"
+	// Blok import yang diperbaiki dan lengkap
+	"github.com/ryannovarypradana/fnb-microservice-api/pkg/dto"
+	"github.com/ryannovarypradana/fnb-microservice-api/pkg/grpc/client"
+	orderPb "github.com/ryannovarypradana/fnb-microservice-api/pkg/grpc/protoc/order"
 )
 
 type OrderHandler struct {
-	client order.OrderServiceClient
+	client client.IOrderServiceClient
 }
 
-func NewOrderHandler(client order.OrderServiceClient) *OrderHandler {
+func NewOrderHandler(client client.IOrderServiceClient) *OrderHandler {
 	return &OrderHandler{client: client}
 }
 
 func (h *OrderHandler) CreateOrder(c *fiber.Ctx) error {
-	req := new(order.CreateOrderRequest)
-	if err := c.BodyParser(req); err != nil {
+	body := new(dto.CreateOrderRequest)
+	if err := c.BodyParser(body); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
 	}
 
-	claims, ok := c.Locals("user_claims").(jwt.MapClaims)
+	userID, ok := c.Locals("userID").(string)
 	if !ok {
-		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "invalid token claims"})
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Invalid user ID in token"})
 	}
 
-	userId, ok := claims["id"].(string)
-	if !ok {
-		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "user id not found in token"})
-	}
-
-	req.UserId = userId
-
-	res, err := h.client.CreateOrder(c.Context(), req)
+	userIDInt, err := strconv.ParseInt(userID, 10, 64)
 	if err != nil {
-		return c.Status(fiber.StatusConflict).JSON(fiber.Map{"error": err.Error()})
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to parse user ID"})
+	}
+
+	grpcRequest := &orderPb.CreateOrderRequest{
+		UserId:  userIDInt,
+		StoreId: int64(body.StoreID),
+	}
+
+	for _, item := range body.Items {
+		grpcRequest.Items = append(grpcRequest.Items, &orderPb.OrderItemRequest{
+			ProductId: int64(item.ProductID),
+			Quantity:  int32(item.Quantity),
+		})
+	}
+
+	res, err := h.client.GetOrderServiceClient().CreateOrder(c.Context(), grpcRequest)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 	}
 
 	return c.Status(fiber.StatusCreated).JSON(res)
 }
 
-func (h *OrderHandler) GetOrderById(c *fiber.Ctx) error {
-	req := &order.GetOrderByIdRequest{
-		Id: c.Params("id"),
+func (h *OrderHandler) GetOrderByID(c *fiber.Ctx) error {
+	orderID, err := strconv.ParseInt(c.Params("orderID"), 10, 64)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid order ID"})
 	}
 
-	// Logika otorisasi tambahan bisa dilakukan di sini atau di service-level
-	// Misalnya, memastikan user yang request adalah pemilik order atau seorang admin.
+	grpcRequest := &orderPb.GetOrderRequest{Id: orderID}
 
-	res, err := h.client.GetOrderById(c.Context(), req)
+	res, err := h.client.GetOrderServiceClient().GetOrder(c.Context(), grpcRequest)
 	if err != nil {
-		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "order not found"})
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": err.Error()})
 	}
 
 	return c.Status(fiber.StatusOK).JSON(res)
 }
 
-func (h *OrderHandler) GetAllOrdersForUser(c *fiber.Ctx) error {
-	claims, ok := c.Locals("user_claims").(jwt.MapClaims)
+func (h *OrderHandler) GetAllOrders(c *fiber.Ctx) error {
+	userID, ok := c.Locals("userID").(string)
 	if !ok {
-		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "invalid token claims"})
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Invalid user ID in token"})
 	}
 
-	userId, ok := claims["id"].(string)
-	if !ok {
-		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "user id not found in token"})
+	userIDInt, err := strconv.ParseInt(userID, 10, 64)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to parse user ID"})
 	}
 
-	req := &order.GetAllOrdersRequest{
-		UserId: userId, // Filter pesanan hanya untuk pengguna yang sedang login
-	}
+	grpcRequest := &orderPb.GetAllOrdersRequest{UserId: userIDInt}
 
-	res, err := h.client.GetAllOrders(c.Context(), req)
+	res, err := h.client.GetOrderServiceClient().GetAllOrders(c.Context(), grpcRequest)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 	}

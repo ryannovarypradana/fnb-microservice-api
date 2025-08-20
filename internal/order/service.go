@@ -6,99 +6,62 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/google/uuid"
-	"github.com/ryannovarypradana/fnb-microservice-api/pkg/eventbus"
-	"github.com/ryannovarypradana/fnb-microservice-api/pkg/grpc/protoc/order"
-	"github.com/ryannovarypradana/fnb-microservice-api/pkg/grpc/protoc/product"
+	"github.com/ryannovarypradana/fnb-microservice-api/pkg/grpc/client"
+	productpb "github.com/ryannovarypradana/fnb-microservice-api/pkg/grpc/protoc/product"
 	"github.com/ryannovarypradana/fnb-microservice-api/pkg/model"
 )
 
-type Service interface {
-	CreateOrder(ctx context.Context, req *order.CreateOrderRequest) (*model.Order, error)
-	GetOrderByID(ctx context.Context, id string) (*model.Order, error)
-	GetAllOrdersByUserID(ctx context.Context, userID string) ([]*model.Order, error)
+type IService interface {
+	CreateOrder(ctx context.Context, order *model.Order, items []*model.OrderItem) error
+	GetOrderByID(ctx context.Context, orderID uint) (*model.Order, error)
+	GetAllOrdersByUserID(ctx context.Context, userID uint) ([]*model.Order, error)
 }
 
-type orderService struct {
-	repo           Repository
-	productClient  product.ProductServiceClient
-	eventPublisher eventbus.Publisher
+type Service struct {
+	repo          IRepository
+	productClient client.IProductServiceClient
 }
 
-func NewService(repo Repository, productClient product.ProductServiceClient, publisher eventbus.Publisher) Service {
-	return &orderService{
-		repo:           repo,
-		productClient:  productClient,
-		eventPublisher: publisher,
+func NewOrderService(repo IRepository, productClient client.IProductServiceClient) IService {
+	return &Service{
+		repo:          repo,
+		productClient: productClient,
 	}
 }
 
-func (s *orderService) CreateOrder(ctx context.Context, req *order.CreateOrderRequest) (*model.Order, error) {
-	userUUID, err := uuid.Parse(req.GetUserId())
-	if err != nil {
-		return nil, errors.New("invalid user id format")
-	}
+func (s *Service) CreateOrder(ctx context.Context, order *model.Order, items []*model.OrderItem) error {
+	var totalAmount float64 = 0
 
-	var orderItems []model.OrderItem
-	var totalPrice float64
-	for _, item := range req.GetItems() {
-		productInfo, err := s.productClient.GetProduct(ctx, &product.GetProductRequest{Id: item.GetProductId()})
+	for _, item := range items {
+		grpcRequest := &productpb.GetMenuByIDRequest{MenuId: int64(item.ProductID)}
+		productResponse, err := s.productClient.GetProductServiceClient().GetMenuByID(ctx, grpcRequest)
+
 		if err != nil {
-			return nil, fmt.Errorf("product with id %s not found", item.GetProductId())
+			log.Printf("Failed to get menu with ID %d: %v", item.ProductID, err)
+			return fmt.Errorf("invalid menu item with ID: %d", item.ProductID)
 		}
 
-		price := productInfo.GetProduct().GetPrice()
-		subtotal := price * float64(item.GetQuantity())
-		totalPrice += subtotal
-
-		orderItems = append(orderItems, model.OrderItem{
-			ProductID: uuid.MustParse(item.GetProductId()),
-			Quantity:  int(item.GetQuantity()),
-			Subtotal:  subtotal,
-		})
+		item.Price = productResponse.Menu.Price
+		totalAmount += item.Price * float64(item.Quantity)
 	}
 
-	newOrder := &model.Order{
-		UserID:     userUUID,
-		Status:     "PENDING",
-		TotalPrice: totalPrice,
+	order.TotalAmount = totalAmount
+
+	if err := s.repo.CreateOrderWithItems(order, items); err != nil {
+		return err
 	}
 
-	if err := s.repo.Create(ctx, newOrder, orderItems); err != nil {
-		return nil, err
-	}
-
-	log.Printf("Mempublikasikan event 'order.created' untuk Order ID: %s", newOrder.ID.String())
-	eventPayload := map[string]interface{}{
-		"order_id":    newOrder.ID.String(),
-		"user_id":     newOrder.UserID.String(),
-		"total_price": newOrder.TotalPrice,
-		"status":      newOrder.Status,
-	}
-
-	go func() {
-		err := s.eventPublisher.Publish("fnb_events", "order.created", "application/json", eventPayload)
-		if err != nil {
-			log.Printf("ERROR: Gagal mempublikasikan event order.created untuk Order ID %s: %v", newOrder.ID.String(), err)
-		}
-	}()
-
-	newOrder.Items = orderItems
-	return newOrder, nil
+	return nil
 }
 
-func (s *orderService) GetOrderByID(ctx context.Context, id string) (*model.Order, error) {
-	orderUUID, err := uuid.Parse(id)
+func (s *Service) GetOrderByID(ctx context.Context, orderID uint) (*model.Order, error) {
+	order, err := s.repo.FindOrderByID(orderID)
 	if err != nil {
-		return nil, err
+		return nil, errors.New("order not found")
 	}
-	return s.repo.FindByID(ctx, orderUUID)
+	return order, nil
 }
 
-func (s *orderService) GetAllOrdersByUserID(ctx context.Context, userID string) ([]*model.Order, error) {
-	userUUID, err := uuid.Parse(userID)
-	if err != nil {
-		return nil, err
-	}
-	return s.repo.FindAllByUserID(ctx, userUUID)
+func (s *Service) GetAllOrdersByUserID(ctx context.Context, userID uint) ([]*model.Order, error) {
+	return s.repo.FindOrdersByUserID(userID)
 }

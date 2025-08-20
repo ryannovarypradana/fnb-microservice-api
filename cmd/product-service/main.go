@@ -1,56 +1,54 @@
 package main
 
 import (
-	"fmt"
 	"log"
 	"net"
 	"os"
 
+	"github.com/joho/godotenv"
+	"google.golang.org/grpc"
+
+	// Perbaikan di sini: Menambahkan semua import yang diperlukan
+	"github.com/ryannovarypradana/fnb-microservice-api/config"
 	internalProduct "github.com/ryannovarypradana/fnb-microservice-api/internal/product"
 	"github.com/ryannovarypradana/fnb-microservice-api/pkg/database"
-	"github.com/ryannovarypradana/fnb-microservice-api/pkg/grpc/client" // <-- Import paket client
-	productPB "github.com/ryannovarypradana/fnb-microservice-api/pkg/grpc/protoc/product"
+	pb "github.com/ryannovarypradana/fnb-microservice-api/pkg/grpc/protoc/product"
+	"github.com/ryannovarypradana/fnb-microservice-api/pkg/logger"
 	"github.com/ryannovarypradana/fnb-microservice-api/pkg/model"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/reflection"
 )
 
 func main() {
-	log.Println("Starting Product Service...")
+	if os.Getenv("APP_ENV") != "production" {
+		err := godotenv.Load()
+		if err != nil {
+			log.Fatalf("Error loading .env file: %v", err)
+		}
+	}
 
-	db, err := database.NewPostgresConnection()
+	cfg := config.Get()
+	db, err := database.NewPostgres(cfg)
 	if err != nil {
-		log.Fatalf("failed to connect to database: %v", err)
+		log.Fatalf("Error connecting to database: %v", err)
 	}
 
-	if err := db.AutoMigrate(&model.Product{}); err != nil {
-		log.Fatalf("failed to migrate database: %v", err)
-	}
+	// Menggunakan model.Menu dan model.Category
+	db.AutoMigrate(&model.Menu{}, &model.Category{}, &model.Store{})
+	logger.InitLogger()
 
-	// 1. Inisialisasi gRPC client untuk store-service
-	storeClient := client.NewStoreClient()
-
-	// 2. Suntikkan (inject) storeClient ke dalam productService
-	productRepo := internalProduct.NewRepository(db)
-	productService := internalProduct.NewService(productRepo, storeClient) // <-- Diperbarui
-	productHandler := internalProduct.NewGRPCHandler(productService)
-
-	port := os.Getenv("PRODUCT_SERVICE_PORT")
-	if port == "" {
-		port = "50053"
-	}
-
-	lis, err := net.Listen("tcp", fmt.Sprintf(":%s", port))
+	lis, err := net.Listen("tcp", ":"+cfg.Product.Port)
 	if err != nil {
-		log.Fatalf("failed to listen: %v", err)
+		log.Fatalf("Failed to listen: %v", err)
 	}
+
+	productRepository := internalProduct.NewProductRepository(db)
+	productService := internalProduct.NewProductService(productRepository)
+	productGRPCHandler := internalProduct.NewProductGRPCHandler(productService)
 
 	grpcServer := grpc.NewServer()
-	productPB.RegisterProductServiceServer(grpcServer, productHandler)
-	reflection.Register(grpcServer)
+	pb.RegisterProductServiceServer(grpcServer, productGRPCHandler)
 
-	log.Printf("Product gRPC server listening on port %s", port)
+	log.Printf("Product service is running on port %s", cfg.Product.Port)
 	if err := grpcServer.Serve(lis); err != nil {
-		log.Fatalf("failed to serve gRPC: %v", err)
+		log.Fatalf("Failed to serve: %v", err)
 	}
 }

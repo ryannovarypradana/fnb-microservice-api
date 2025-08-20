@@ -9,7 +9,7 @@ import (
 
 	"github.com/ryannovarypradana/fnb-microservice-api/pkg/model"
 
-	"github.com/golang-jwt/jwt/v4"
+	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 )

@@ -4,68 +4,137 @@ package product;
 
 option go_package = "./pkg/grpc/protoc/product";
 
-message Product {
-    string id = 1;
-    string name = 2;
-    string description = 3;
-    double price = 4;
-    string store_id = 5; // Tambahkan field relevan lainnya
+// Representasi Menu
+message Menu {
+  int64 id = 1;
+  string name = 2;
+  string description = 3;
+  double price = 4;
+  string image_url = 5;
+  int64 category_id = 6;
+  string category_name = 7; // Untuk kemudahan di response
+  int64 store_id = 8;
+  string created_at = 9;
+  string updated_at = 10;
 }
 
-// -- DEFINISI BARU --
-message CreateProductRequest {
-    string name = 1;
-    string description = 2;
-    double price = 3;
-    string store_id = 4;
+// Representasi Kategori
+message Category {
+  int64 id = 1;
+  string name = 2;
+  int64 store_id = 3;
+  string created_at = 4;
+  string updated_at = 5;
 }
 
-message CreateProductResponse {
-    Product product = 1;
+// Request & Response untuk Menu
+message CreateMenuRequest {
+  string name = 1;
+  string description = 2;
+  double price = 3;
+  string image_url = 4;
+  int64 category_id = 5;
+  int64 store_id = 6;
 }
 
-message GetProductRequest {
-    string id = 1;
+message CreateMenuResponse {
+  Menu menu = 1;
 }
 
-message GetProductResponse {
-    Product product = 1;
+message GetMenuByIDRequest {
+  int64 menu_id = 1;
 }
 
-message GetAllProductsRequest {
-    string search = 1;
-    string store_id = 2;
+message GetMenuByIDResponse {
+  Menu menu = 1;
 }
 
-message GetAllProductsResponse {
-    repeated Product products = 1;
+message UpdateMenuRequest {
+  int64 menu_id = 1;
+  string name = 2;
+  string description = 3;
+  double price = 4;
+  string image_url = 5;
+  int64 category_id = 6;
 }
 
-message UpdateProductRequest {
-    string id = 1;
-    string name = 2;
-    string description = 3;
-    double price = 4;
+message UpdateMenuResponse {
+    Menu menu = 1;
 }
 
-message UpdateProductResponse {
-    Product product = 1;
+message DeleteMenuRequest {
+  int64 menu_id = 1;
 }
 
-message DeleteProductRequest {
-    string id = 1;
+message DeleteMenuResponse {
+  string message = 1;
 }
 
-message DeleteProductResponse {
-    string message = 1;
+message GetMenusByStoreIDRequest {
+    int64 store_id = 1;
 }
-// -- AKHIR DEFINISI BARU --
 
+message GetMenusByStoreIDResponse {
+    repeated Menu menus = 1;
+}
+
+
+// Request & Response untuk Kategori
+message CreateCategoryRequest {
+  string name = 1;
+  int64 store_id = 2;
+}
+
+message CreateCategoryResponse {
+  Category category = 1;
+}
+
+message GetCategoryByIDRequest {
+  int64 category_id = 1;
+}
+
+message GetCategoryByIDResponse {
+  Category category = 1;
+}
+
+message UpdateCategoryRequest {
+  int64 category_id = 1;
+  string name = 2;
+}
+
+message UpdateCategoryResponse {
+    Category category = 1;
+}
+
+message DeleteCategoryRequest {
+  int64 category_id = 1;
+}
+
+message DeleteCategoryResponse {
+  string message = 1;
+}
+
+message GetCategoriesByStoreIDRequest {
+    int64 store_id = 1;
+}
+
+message GetCategoriesByStoreIDResponse {
+    repeated Category categories = 1;
+}
+
+// Definisi Service
 service ProductService {
-    // -- PERBARUI RPC --
-    rpc CreateProduct(CreateProductRequest) returns (CreateProductResponse);
-    rpc GetProduct(GetProductRequest) returns (GetProductResponse);
-    rpc GetAllProducts(GetAllProductsRequest) returns (GetAllProductsResponse);
-    rpc UpdateProduct(UpdateProductRequest) returns (UpdateProductResponse);
-    rpc DeleteProduct(DeleteProductRequest) returns (DeleteProductResponse);
+  // Menu RPCs
+  rpc CreateMenu(CreateMenuRequest) returns (CreateMenuResponse);
+  rpc GetMenuByID(GetMenuByIDRequest) returns (GetMenuByIDResponse);
+  rpc UpdateMenu(UpdateMenuRequest) returns (UpdateMenuResponse);
+  rpc DeleteMenu(DeleteMenuRequest) returns (DeleteMenuResponse);
+  rpc GetMenusByStoreID(GetMenusByStoreIDRequest) returns (GetMenusByStoreIDResponse);
+
+  // Category RPCs
+  rpc CreateCategory(CreateCategoryRequest) returns (CreateCategoryResponse);
+  rpc GetCategoryByID(GetCategoryByIDRequest) returns (GetCategoryByIDResponse);
+  rpc UpdateCategory(UpdateCategoryRequest) returns (UpdateCategoryResponse);
+  rpc DeleteCategory(DeleteCategoryRequest) returns (DeleteCategoryResponse);
+  rpc GetCategoriesByStoreID(GetCategoriesByStoreIDRequest) returns (GetCategoriesByStoreIDResponse);
 }

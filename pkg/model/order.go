@@ -1,35 +1,28 @@
 package model
 
 import (
-	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
+// Order merepresentasikan pesanan utama.
 type Order struct {
-	ID         uuid.UUID      `json:"id" gorm:"type:uuid;primary_key;"`
-	UserID     uuid.UUID      `json:"user_id" gorm:"type:uuid"`
-	Status     string         `json:"status"`
-	TotalPrice float64        `json:"total_price"`
-	DeletedAt  gorm.DeletedAt `json:"-" gorm:"index"`
-
-	// FIX: Add the relationship to OrderItem
-	Items []OrderItem `json:"items"`
+	gorm.Model
+	UserID      uint `gorm:"not null"`
+	User        User
+	StoreID     uint `gorm:"not null"`
+	Store       Store
+	TotalAmount float64 `gorm:"not null"`
+	Status      string  `gorm:"type:varchar(50);not null;default:'PENDING'"`
+	OrderItems  []OrderItem
 }
 
+// OrderItem merepresentasikan setiap item di dalam sebuah pesanan.
 type OrderItem struct {
-	ID      uuid.UUID `json:"id" gorm:"type:uuid;primary_key;"`
-	OrderID uuid.UUID `json:"order_id" gorm:"type:uuid"`
-	// FIX: Field should be ProductID to match the service logic
-	ProductID uuid.UUID `json:"product_id" gorm:"type:uuid"`
-	Quantity  int       `json:"quantity"`
-	// FIX: Field should be Subtotal
-	Subtotal  float64        `json:"subtotal"`
-	DeletedAt gorm.DeletedAt `json:"-" gorm:"index"`
-}
-
-func (o *Order) BeforeCreate(tx *gorm.DB) (err error) {
-	if o.ID == uuid.Nil {
-		o.ID = uuid.New()
-	}
-	return
+	gorm.Model
+	OrderID uint `gorm:"not null"`
+	// Perbaikan di sini: Menggunakan ProductID agar konsisten dengan relasi GORM
+	ProductID uint    `gorm:"not null"`
+	Menu      Menu    `gorm:"foreignKey:ProductID"`
+	Quantity  int     `gorm:"not null"`
+	Price     float64 `gorm:"not null"` // Harga per item saat transaksi
 }

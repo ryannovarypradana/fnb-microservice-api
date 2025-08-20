@@ -1,22 +1,27 @@
 package model
 
 import (
-	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
-type Product struct {
-	ID          uuid.UUID      `json:"id" gorm:"type:uuid;primary_key;"`
-	Name        string         `json:"name" gorm:"type:varchar(255);not null"`
-	Description string         `json:"description"`
-	Price       float64        `json:"price" gorm:"not null"`
-	StoreID     uuid.UUID      `json:"store_id" gorm:"type:uuid"`
-	DeletedAt   gorm.DeletedAt `json:"-" gorm:"index"`
+// Category merepresentasikan kategori dari sebuah menu di dalam toko.
+type Category struct {
+	gorm.Model
+	Name    string `gorm:"type:varchar(100);not null"`
+	StoreID uint   `gorm:"not null"`
+	Store   Store
+	Menus   []Menu // Sebuah kategori bisa memiliki banyak menu
 }
 
-func (p *Product) BeforeCreate(tx *gorm.DB) (err error) {
-	if p.ID == uuid.Nil {
-		p.ID = uuid.New()
-	}
-	return
+// Menu merepresentasikan item yang bisa dijual (sebelumnya Product).
+type Menu struct {
+	gorm.Model
+	Name        string `gorm:"type:varchar(255);not null"`
+	Description string
+	Price       float64 `gorm:"not null;default:0"`
+	ImageURL    string
+	StoreID     uint `gorm:"not null"`
+	Store       Store
+	CategoryID  uint `gorm:"not null"`
+	Category    Category
 }

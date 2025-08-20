@@ -2,58 +2,127 @@ package client
 
 import (
 	"log"
-	"os"
 
-	"github.com/ryannovarypradana/fnb-microservice-api/pkg/grpc/protoc/auth"
-	"github.com/ryannovarypradana/fnb-microservice-api/pkg/grpc/protoc/company"
-	"github.com/ryannovarypradana/fnb-microservice-api/pkg/grpc/protoc/order"
-	"github.com/ryannovarypradana/fnb-microservice-api/pkg/grpc/protoc/product"
-	"github.com/ryannovarypradana/fnb-microservice-api/pkg/grpc/protoc/store"
-	"github.com/ryannovarypradana/fnb-microservice-api/pkg/grpc/protoc/user"
+	authPb "github.com/ryannovarypradana/fnb-microservice-api/pkg/grpc/protoc/auth"
+	companyPb "github.com/ryannovarypradana/fnb-microservice-api/pkg/grpc/protoc/company"
+	orderPb "github.com/ryannovarypradana/fnb-microservice-api/pkg/grpc/protoc/order"
+	productPb "github.com/ryannovarypradana/fnb-microservice-api/pkg/grpc/protoc/product"
+	storePb "github.com/ryannovarypradana/fnb-microservice-api/pkg/grpc/protoc/store"
+	userPb "github.com/ryannovarypradana/fnb-microservice-api/pkg/grpc/protoc/user"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
 
-func newGRPCConnection(target string) *grpc.ClientConn {
-	conn, err := grpc.NewClient(target, grpc.WithTransportCredentials(insecure.NewCredentials()))
+// --- Auth Service Client ---
+type IAuthServiceClient interface {
+	GetAuthServiceClient() authPb.AuthServiceClient
+}
+type AuthServiceClient struct {
+	Client authPb.AuthServiceClient
+}
+
+func NewAuthServiceClient(port string) IAuthServiceClient {
+	conn, err := grpc.Dial("localhost:"+port, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
-		log.Fatalf("Failed to connect to gRPC server at %s: %v", target, err)
+		log.Fatalf("Could not connect to auth service: %v", err)
 	}
-	return conn
+	return &AuthServiceClient{Client: authPb.NewAuthServiceClient(conn)}
+}
+func (c *AuthServiceClient) GetAuthServiceClient() authPb.AuthServiceClient {
+	return c.Client
 }
 
-func NewAuthClient() auth.AuthServiceClient {
-	target := os.Getenv("AUTH_SERVICE_URL") // e.g., "localhost:50051"
-	conn := newGRPCConnection(target)
-	return auth.NewAuthServiceClient(conn)
+// --- Product Service Client ---
+type IProductServiceClient interface {
+	GetProductServiceClient() productPb.ProductServiceClient
+}
+type ProductServiceClient struct {
+	Client productPb.ProductServiceClient
 }
 
-func NewUserClient() user.UserServiceClient {
-	target := os.Getenv("USER_SERVICE_URL") // e.g., "localhost:50052"
-	conn := newGRPCConnection(target)
-	return user.NewUserServiceClient(conn)
+func NewProductServiceClient(port string) IProductServiceClient {
+	conn, err := grpc.Dial("localhost:"+port, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		log.Fatalf("Could not connect to product service: %v", err)
+	}
+	return &ProductServiceClient{Client: productPb.NewProductServiceClient(conn)}
+}
+func (p *ProductServiceClient) GetProductServiceClient() productPb.ProductServiceClient {
+	return p.Client
 }
 
-func NewProductClient() product.ProductServiceClient {
-	target := os.Getenv("PRODUCT_SERVICE_URL") // e.g., "localhost:50053"
-	conn := newGRPCConnection(target)
-	return product.NewProductServiceClient(conn)
+// --- Order Service Client (Perbaikan Kunci di Sini) ---
+type IOrderServiceClient interface {
+	GetOrderServiceClient() orderPb.OrderServiceClient
+}
+type OrderServiceClient struct {
+	Client orderPb.OrderServiceClient
 }
 
-func NewCompanyClient() company.CompanyServiceClient {
-	target := os.Getenv("COMPANY_SERVICE_URL") // e.g., "localhost:50054"
-	conn := newGRPCConnection(target)
-	return company.NewCompanyServiceClient(conn)
+func NewOrderServiceClient(port string) IOrderServiceClient {
+	conn, err := grpc.Dial("localhost:"+port, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		log.Fatalf("Could not connect to order service: %v", err)
+	}
+	return &OrderServiceClient{Client: orderPb.NewOrderServiceClient(conn)}
+}
+func (o *OrderServiceClient) GetOrderServiceClient() orderPb.OrderServiceClient {
+	return o.Client
 }
 
-func NewStoreClient() store.StoreServiceClient {
-	target := os.Getenv("STORE_SERVICE_URL") // e.g., "localhost:50055"
-	conn := newGRPCConnection(target)
-	return store.NewStoreServiceClient(conn)
+// --- User Service Client ---
+type IUserServiceClient interface {
+	GetUserServiceClient() userPb.UserServiceClient
+}
+type UserServiceClient struct {
+	Client userPb.UserServiceClient
 }
 
-func NewOrderClient() order.OrderServiceClient {
-	target := os.Getenv("ORDER_SERVICE_URL") // e.g., "localhost:50056"
-	conn := newGRPCConnection(target)
-	return order.NewOrderServiceClient(conn)
+func NewUserServiceClient(port string) IUserServiceClient {
+	conn, err := grpc.Dial("localhost:"+port, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		log.Fatalf("Could not connect to user service: %v", err)
+	}
+	return &UserServiceClient{Client: userPb.NewUserServiceClient(conn)}
+}
+func (u *UserServiceClient) GetUserServiceClient() userPb.UserServiceClient {
+	return u.Client
+}
+
+// --- Store Service Client ---
+type IStoreServiceClient interface {
+	GetStoreServiceClient() storePb.StoreServiceClient
+}
+type StoreServiceClient struct {
+	Client storePb.StoreServiceClient
+}
+
+func NewStoreServiceClient(port string) IStoreServiceClient {
+	conn, err := grpc.Dial("localhost:"+port, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		log.Fatalf("Could not connect to store service: %v", err)
+	}
+	return &StoreServiceClient{Client: storePb.NewStoreServiceClient(conn)}
+}
+func (s *StoreServiceClient) GetStoreServiceClient() storePb.StoreServiceClient {
+	return s.Client
+}
+
+// --- Company Service Client ---
+type ICompanyServiceClient interface {
+	GetCompanyServiceClient() companyPb.CompanyServiceClient
+}
+type CompanyServiceClient struct {
+	Client companyPb.CompanyServiceClient
+}
+
+func NewCompanyServiceClient(port string) ICompanyServiceClient {
+	conn, err := grpc.Dial("localhost:"+port, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		log.Fatalf("Could not connect to company service: %v", err)
+	}
+	return &CompanyServiceClient{Client: companyPb.NewCompanyServiceClient(conn)}
+}
+func (c *CompanyServiceClient) GetCompanyServiceClient() companyPb.CompanyServiceClient {
+	return c.Client
 }
