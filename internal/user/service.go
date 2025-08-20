@@ -3,86 +3,110 @@ package user
 import (
 	"context"
 	"errors"
-	"fmt"
-	"log"
 
 	"github.com/google/uuid"
-	// FIX: Import paket eventbus tanpa alias yang salah
-	"github.com/ryannovarypradana/fnb-microservice-api/pkg/eventbus"
-	"github.com/ryannovarypradana/fnb-microservice-api/pkg/grpc/protoc/store"
-	"github.com/ryannovarypradana/fnb-microservice-api/pkg/grpc/protoc/user"
-	"github.com/ryannovarypradana/fnb-microservice-api/pkg/model"
 	"golang.org/x/crypto/bcrypt"
+
+	companyPB "github.com/ryannovarypradana/fnb-microservice-api/pkg/grpc/protoc/company"
+	userPB "github.com/ryannovarypradana/fnb-microservice-api/pkg/grpc/protoc/user"
+	"github.com/ryannovarypradana/fnb-microservice-api/pkg/model"
 )
 
-type Service interface {
-	GetUserByID(ctx context.Context, id string) (*model.User, error)
-	RegisterStaff(ctx context.Context, req *user.RegisterStaffRequest) (*model.User, error)
+type UserService interface {
+	GetUser(ctx context.Context, req *userPB.GetUserRequest) (*model.User, error)
+	RegisterStaff(ctx context.Context, req *userPB.RegisterStaffRequest) (*model.User, error)
+	UpdateUser(ctx context.Context, req *userPB.UpdateUserRequest) (*model.User, error)
+	DeleteUser(ctx context.Context, id string) error
+	CreateCompanyWithRep(ctx context.Context, req *userPB.CreateCompanyWithRepRequest) (*companyPB.Company, *model.User, error)
 }
 
 type userService struct {
-	repo        Repository
-	storeClient store.StoreServiceClient
-	// FIX: Gunakan tipe yang benar dari paket yang diimpor
-	eventPublisher eventbus.Publisher
+	repo          UserRepository
+	companyClient companyPB.CompanyServiceClient
 }
 
-func NewService(repo Repository, storeClient store.StoreServiceClient, publisher eventbus.Publisher) Service {
-	return &userService{
-		repo:           repo,
-		storeClient:    storeClient,
-		eventPublisher: publisher,
-	}
+func NewUserService(repo UserRepository, companyClient companyPB.CompanyServiceClient) UserService {
+	return &userService{repo: repo, companyClient: companyClient}
 }
 
-func (s *userService) GetUserByID(ctx context.Context, id string) (*model.User, error) {
-	userUUID, err := uuid.Parse(id)
+func (s *userService) GetUser(ctx context.Context, req *userPB.GetUserRequest) (*model.User, error) {
+	return s.repo.FindByID(ctx, req.Id)
+}
+
+func (s *userService) RegisterStaff(ctx context.Context, req *userPB.RegisterStaffRequest) (*model.User, error) {
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 	if err != nil {
-		return nil, err
-	}
-	return s.repo.FindByID(ctx, userUUID)
-}
-
-func (s *userService) RegisterStaff(ctx context.Context, req *user.RegisterStaffRequest) (*model.User, error) {
-	storeInfo, err := s.storeClient.GetStore(ctx, &store.GetStoreRequest{Id: req.GetStoreId()})
-	if err != nil {
-		return nil, errors.New("toko yang dituju tidak valid atau tidak ditemukan")
+		return nil, errors.New("failed to hash password")
 	}
 
-	if storeInfo.GetStore().GetCompanyId() != req.GetActorCompanyId() {
-		return nil, errors.New("akses ditolak: anda tidak bisa mendaftarkan staf untuk toko di luar perusahaan anda")
-	}
-
-	hashedPassword, _ := bcrypt.GenerateFromPassword([]byte(req.GetPassword()), bcrypt.DefaultCost)
-	storeUUID, _ := uuid.Parse(req.GetStoreId())
-	companyUUID, _ := uuid.Parse(req.GetActorCompanyId())
+	storeID, _ := uuid.Parse(req.StoreId)
 
 	newUser := &model.User{
-		Name:      req.GetName(),
-		Email:     req.GetEmail(),
-		Password:  string(hashedPassword),
-		Role:      req.GetRole(),
-		StoreID:   &storeUUID,
-		CompanyID: &companyUUID,
+		Name:     req.Name,
+		Email:    req.Email,
+		Password: string(hashedPassword),
+		Role:     model.Role(req.Role), // This cast is correct
+		StoreID:  &storeID,
 	}
 
 	if err := s.repo.Create(ctx, newUser); err != nil {
-		return nil, fmt.Errorf("gagal membuat user: %w", err)
+		return nil, err
 	}
-
-	log.Printf("Mempublikasikan event 'user.registered' untuk user %s", newUser.Email)
-	eventPayload := map[string]interface{}{
-		"user_id": newUser.ID.String(),
-		"email":   newUser.Email,
-		"name":    newUser.Name,
-	}
-
-	go func() {
-		err := s.eventPublisher.Publish("user_events", "user.registered", "application/json", eventPayload)
-		if err != nil {
-			log.Printf("ERROR: Gagal mempublikasikan event user.registered untuk user %s: %v", newUser.Email, err)
-		}
-	}()
-
 	return newUser, nil
+}
+
+func (s *userService) UpdateUser(ctx context.Context, req *userPB.UpdateUserRequest) (*model.User, error) {
+	user, err := s.repo.FindByID(ctx, req.Id)
+	if err != nil {
+		return nil, err
+	}
+
+	if req.Name != nil {
+		user.Name = *req.Name
+	}
+	if req.Email != nil {
+		user.Email = *req.Email
+	}
+
+	if err := s.repo.Update(ctx, user); err != nil {
+		return nil, err
+	}
+	return user, nil
+}
+
+func (s *userService) DeleteUser(ctx context.Context, id string) error {
+	return s.repo.Delete(ctx, id)
+}
+
+func (s *userService) CreateCompanyWithRep(ctx context.Context, req *userPB.CreateCompanyWithRepRequest) (*companyPB.Company, *model.User, error) {
+	createCompanyReq := &companyPB.CreateCompanyRequest{
+		Name:    req.CompanyName,
+		Address: req.CompanyAddress,
+	}
+
+	companyRes, err := s.companyClient.CreateCompany(ctx, createCompanyReq)
+	if err != nil {
+		return nil, nil, errors.New("failed to create company via gRPC: " + err.Error())
+	}
+	newCompany := companyRes.Company
+
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.UserPassword), bcrypt.DefaultCost)
+	if err != nil {
+		return nil, nil, errors.New("failed to hash password")
+	}
+
+	companyID, _ := uuid.Parse(newCompany.Id)
+	newUser := &model.User{
+		Name:      req.UserName,
+		Email:     req.UserEmail,
+		Password:  string(hashedPassword),
+		Role:      model.RoleCompanyRep, // This constant is defined in pkg/model/role.go
+		CompanyID: &companyID,
+	}
+
+	if err := s.repo.Create(ctx, newUser); err != nil {
+		return nil, nil, errors.New("failed to create company representative user: " + err.Error())
+	}
+
+	return newCompany, newUser, nil
 }

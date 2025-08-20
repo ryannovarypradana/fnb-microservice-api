@@ -25,6 +25,9 @@ type StoreServiceClient interface {
 	CreateStore(ctx context.Context, in *CreateStoreRequest, opts ...grpc.CallOption) (*CreateStoreResponse, error)
 	GetStore(ctx context.Context, in *GetStoreRequest, opts ...grpc.CallOption) (*GetStoreResponse, error)
 	GetAllStores(ctx context.Context, in *GetAllStoresRequest, opts ...grpc.CallOption) (*GetAllStoresResponse, error)
+	UpdateStore(ctx context.Context, in *UpdateStoreRequest, opts ...grpc.CallOption) (*GetStoreResponse, error)
+	DeleteStore(ctx context.Context, in *DeleteStoreRequest, opts ...grpc.CallOption) (*DeleteStoreResponse, error)
+	CloneStoreContent(ctx context.Context, in *CloneStoreContentRequest, opts ...grpc.CallOption) (*CloneStoreContentResponse, error)
 }
 
 type storeServiceClient struct {
@@ -62,6 +65,33 @@ func (c *storeServiceClient) GetAllStores(ctx context.Context, in *GetAllStoresR
 	return out, nil
 }
 
+func (c *storeServiceClient) UpdateStore(ctx context.Context, in *UpdateStoreRequest, opts ...grpc.CallOption) (*GetStoreResponse, error) {
+	out := new(GetStoreResponse)
+	err := c.cc.Invoke(ctx, "/store.StoreService/UpdateStore", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *storeServiceClient) DeleteStore(ctx context.Context, in *DeleteStoreRequest, opts ...grpc.CallOption) (*DeleteStoreResponse, error) {
+	out := new(DeleteStoreResponse)
+	err := c.cc.Invoke(ctx, "/store.StoreService/DeleteStore", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *storeServiceClient) CloneStoreContent(ctx context.Context, in *CloneStoreContentRequest, opts ...grpc.CallOption) (*CloneStoreContentResponse, error) {
+	out := new(CloneStoreContentResponse)
+	err := c.cc.Invoke(ctx, "/store.StoreService/CloneStoreContent", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // StoreServiceServer is the server API for StoreService service.
 // All implementations must embed UnimplementedStoreServiceServer
 // for forward compatibility
@@ -69,6 +99,9 @@ type StoreServiceServer interface {
 	CreateStore(context.Context, *CreateStoreRequest) (*CreateStoreResponse, error)
 	GetStore(context.Context, *GetStoreRequest) (*GetStoreResponse, error)
 	GetAllStores(context.Context, *GetAllStoresRequest) (*GetAllStoresResponse, error)
+	UpdateStore(context.Context, *UpdateStoreRequest) (*GetStoreResponse, error)
+	DeleteStore(context.Context, *DeleteStoreRequest) (*DeleteStoreResponse, error)
+	CloneStoreContent(context.Context, *CloneStoreContentRequest) (*CloneStoreContentResponse, error)
 	mustEmbedUnimplementedStoreServiceServer()
 }
 
@@ -84,6 +117,15 @@ func (UnimplementedStoreServiceServer) GetStore(context.Context, *GetStoreReques
 }
 func (UnimplementedStoreServiceServer) GetAllStores(context.Context, *GetAllStoresRequest) (*GetAllStoresResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetAllStores not implemented")
+}
+func (UnimplementedStoreServiceServer) UpdateStore(context.Context, *UpdateStoreRequest) (*GetStoreResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method UpdateStore not implemented")
+}
+func (UnimplementedStoreServiceServer) DeleteStore(context.Context, *DeleteStoreRequest) (*DeleteStoreResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method DeleteStore not implemented")
+}
+func (UnimplementedStoreServiceServer) CloneStoreContent(context.Context, *CloneStoreContentRequest) (*CloneStoreContentResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method CloneStoreContent not implemented")
 }
 func (UnimplementedStoreServiceServer) mustEmbedUnimplementedStoreServiceServer() {}
 
@@ -152,6 +194,60 @@ func _StoreService_GetAllStores_Handler(srv interface{}, ctx context.Context, de
 	return interceptor(ctx, in, info, handler)
 }
 
+func _StoreService_UpdateStore_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateStoreRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(StoreServiceServer).UpdateStore(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/store.StoreService/UpdateStore",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(StoreServiceServer).UpdateStore(ctx, req.(*UpdateStoreRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _StoreService_DeleteStore_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteStoreRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(StoreServiceServer).DeleteStore(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/store.StoreService/DeleteStore",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(StoreServiceServer).DeleteStore(ctx, req.(*DeleteStoreRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _StoreService_CloneStoreContent_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CloneStoreContentRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(StoreServiceServer).CloneStoreContent(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/store.StoreService/CloneStoreContent",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(StoreServiceServer).CloneStoreContent(ctx, req.(*CloneStoreContentRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // StoreService_ServiceDesc is the grpc.ServiceDesc for StoreService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -170,6 +266,18 @@ var StoreService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetAllStores",
 			Handler:    _StoreService_GetAllStores_Handler,
+		},
+		{
+			MethodName: "UpdateStore",
+			Handler:    _StoreService_UpdateStore_Handler,
+		},
+		{
+			MethodName: "DeleteStore",
+			Handler:    _StoreService_DeleteStore_Handler,
+		},
+		{
+			MethodName: "CloneStoreContent",
+			Handler:    _StoreService_CloneStoreContent_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

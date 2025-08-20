@@ -2,58 +2,92 @@ package handler
 
 import (
 	"github.com/gofiber/fiber/v2"
-	"github.com/ryannovarypradana/fnb-microservice-api/pkg/grpc/protoc/store"
+	pb "github.com/ryannovarypradana/fnb-microservice-api/pkg/grpc/protoc/store"
 )
 
 type StoreHandler struct {
-	client store.StoreServiceClient
+	client pb.StoreServiceClient
 }
 
-func NewStoreHandler(client store.StoreServiceClient) *StoreHandler {
+func NewStoreHandler(client pb.StoreServiceClient) *StoreHandler {
 	return &StoreHandler{client: client}
 }
 
 func (h *StoreHandler) CreateStore(c *fiber.Ctx) error {
-	req := new(store.CreateStoreRequest)
-	if err := c.BodyParser(req); err != nil {
+	var req pb.CreateStoreRequest
+	if err := c.BodyParser(&req); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
 	}
 
-	// Di aplikasi nyata, CompanyId bisa diambil dari token JWT (actor)
-	// atau divalidasi berdasarkan hak akses pengguna.
-	// Misalnya: claims := c.Locals("user_claims").(jwt.MapClaims)
-	// req.CompanyId = claims["company_id"].(string)
-
-	res, err := h.client.CreateStore(c.Context(), req)
+	res, err := h.client.CreateStore(c.Context(), &req)
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "failed to create store"})
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 	}
-
 	return c.Status(fiber.StatusCreated).JSON(res)
 }
 
 func (h *StoreHandler) GetStore(c *fiber.Ctx) error {
-	req := &store.GetStoreRequest{
-		Id: c.Params("id"),
-	}
+	id := c.Params("id")
+	req := &pb.GetStoreRequest{Id: id}
 
 	res, err := h.client.GetStore(c.Context(), req)
 	if err != nil {
-		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "store not found"})
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": err.Error()})
 	}
-
-	return c.Status(fiber.StatusOK).JSON(res)
+	return c.JSON(res)
 }
 
 func (h *StoreHandler) GetAllStores(c *fiber.Ctx) error {
-	req := &store.GetAllStoresRequest{
-		Search: c.Query("search"),
-	}
+	searchQuery := c.Query("search")
+	req := &pb.GetAllStoresRequest{Search: searchQuery}
 
 	res, err := h.client.GetAllStores(c.Context(), req)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 	}
+	return c.JSON(res)
+}
 
-	return c.Status(fiber.StatusOK).JSON(res)
+func (h *StoreHandler) UpdateStore(c *fiber.Ctx) error {
+	id := c.Params("id")
+	var req pb.UpdateStoreRequest
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid request body"})
+	}
+	req.Id = id
+
+	res, err := h.client.UpdateStore(c.Context(), &req)
+	if err != nil {
+		// Logika ini dapat disesuaikan untuk menangani error 'not found' secara spesifik
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+	}
+	return c.JSON(res)
+}
+
+func (h *StoreHandler) DeleteStore(c *fiber.Ctx) error {
+	id := c.Params("id")
+	req := &pb.DeleteStoreRequest{Id: id}
+
+	res, err := h.client.DeleteStore(c.Context(), req)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+	}
+	return c.JSON(res)
+}
+
+func (h *StoreHandler) CloneStoreContent(c *fiber.Ctx) error {
+	var req pb.CloneStoreContentRequest
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid request body"})
+	}
+
+	if req.SourceStoreId == "" || req.DestinationStoreId == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "source_store_id and destination_store_id are required"})
+	}
+
+	res, err := h.client.CloneStoreContent(c.Context(), &req)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+	}
+	return c.JSON(res)
 }

@@ -3,43 +3,88 @@ package user
 import (
 	"context"
 
-	"github.com/ryannovarypradana/fnb-microservice-api/pkg/grpc/protoc/user"
+	pb "github.com/ryannovarypradana/fnb-microservice-api/pkg/grpc/protoc/user"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
-type GRPCHandler struct {
-	user.UnimplementedUserServiceServer // Penting untuk forward compatibility
-	service                             Service
+type UserGRPCHandler struct {
+	pb.UnimplementedUserServiceServer
+	service UserService
 }
 
-func NewGRPCHandler(s Service) *GRPCHandler {
-	return &GRPCHandler{service: s}
+func NewUserGRPCHandler(grpcServer *grpc.Server, service UserService) {
+	handler := &UserGRPCHandler{service: service}
+	pb.RegisterUserServiceServer(grpcServer, handler)
 }
 
-// GetUser adalah implementasi dari RPC GetUser yang ada di user.proto
-func (h *GRPCHandler) GetUser(ctx context.Context, req *user.GetUserRequest) (*user.GetUserResponse, error) {
-	foundUser, err := h.service.GetUserByID(ctx, req.GetId())
+func (h *UserGRPCHandler) GetUser(ctx context.Context, req *pb.GetUserRequest) (*pb.GetUserResponse, error) {
+	foundUser, err := h.service.GetUser(ctx, req)
 	if err != nil {
-		return nil, err
+		return nil, status.Errorf(codes.NotFound, "user not found: %v", err)
 	}
 
-	// Terjemahkan model internal ke response message protobuf
-	res := &user.GetUserResponse{
-		User: &user.User{
+	res := &pb.GetUserResponse{
+		User: &pb.User{
 			Id:    foundUser.ID.String(),
 			Name:  foundUser.Name,
 			Email: foundUser.Email,
-			Role:  foundUser.Role,
+			Role:  string(foundUser.Role),
 		},
 	}
 
+	// CORRECTED: Assign the address of the string to the pointer field
 	if foundUser.CompanyID != nil {
-		res.User.CompanyId = foundUser.CompanyID.String()
+		companyIDStr := foundUser.CompanyID.String()
+		res.User.CompanyId = &companyIDStr
 	}
 	if foundUser.StoreID != nil {
-		res.User.StoreId = foundUser.StoreID.String()
+		storeIDStr := foundUser.StoreID.String()
+		res.User.StoreId = &storeIDStr
 	}
 
 	return res, nil
 }
 
-// Implementasikan RPC lain dari user.proto di sini...
+func (h *UserGRPCHandler) UpdateUser(ctx context.Context, req *pb.UpdateUserRequest) (*pb.GetUserResponse, error) {
+	updatedUser, err := h.service.UpdateUser(ctx, req)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to update user: %v", err)
+	}
+	// Here, we can reuse the GetUser logic to correctly format the response
+	return h.GetUser(ctx, &pb.GetUserRequest{Id: updatedUser.ID.String()})
+}
+
+func (h *UserGRPCHandler) DeleteUser(ctx context.Context, req *pb.DeleteUserRequest) (*pb.DeleteUserResponse, error) {
+	if err := h.service.DeleteUser(ctx, req.Id); err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to delete user: %v", err)
+	}
+	return &pb.DeleteUserResponse{Message: "User deleted successfully"}, nil
+}
+
+func (h *UserGRPCHandler) CreateCompanyWithRep(ctx context.Context, req *pb.CreateCompanyWithRepRequest) (*pb.CreateCompanyWithRepResponse, error) {
+	company, user, err := h.service.CreateCompanyWithRep(ctx, req)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to create company with rep: %v", err)
+	}
+
+	resUser := &pb.User{
+		Id:    user.ID.String(),
+		Name:  user.Name,
+		Email: user.Email,
+		Role:  string(user.Role),
+	}
+
+	// CORRECTED: Assign the address of the string to the pointer field
+	if user.CompanyID != nil {
+		companyIDStr := user.CompanyID.String()
+		resUser.CompanyId = &companyIDStr
+	}
+
+	return &pb.CreateCompanyWithRepResponse{
+		CompanyId:   company.Id,
+		CompanyName: company.Name,
+		User:        resUser,
+	}, nil
+}

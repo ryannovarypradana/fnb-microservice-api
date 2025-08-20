@@ -1,5 +1,3 @@
-// cmd/user-service/main.go
-
 package main
 
 import (
@@ -7,57 +5,52 @@ import (
 	"log"
 	"net"
 
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
+
 	"github.com/ryannovarypradana/fnb-microservice-api/config"
 	"github.com/ryannovarypradana/fnb-microservice-api/internal/user"
 	"github.com/ryannovarypradana/fnb-microservice-api/pkg/database"
-	"github.com/ryannovarypradana/fnb-microservice-api/pkg/eventbus"
-	"github.com/ryannovarypradana/fnb-microservice-api/pkg/grpc/client"
-	userpb "github.com/ryannovarypradana/fnb-microservice-api/pkg/grpc/protoc/user"
-	"google.golang.org/grpc"
+	companyPB "github.com/ryannovarypradana/fnb-microservice-api/pkg/grpc/protoc/company"
 )
 
 func main() {
 	cfg := config.Get()
+	if cfg == nil {
+		log.Fatalf("FATAL: could not load config")
+	}
 
 	db, err := database.NewPostgres(cfg)
 	if err != nil {
-		log.Fatalf("Failed to connect to database: %v", err)
+		log.Fatalf("FATAL: failed to connect to database: %v", err)
+	}
+	log.Println("Database connection successful.")
+
+	lis, err := net.Listen("tcp", fmt.Sprintf(":%s", cfg.User.Port))
+	if err != nil {
+		log.Fatalf("FATAL: failed to listen on port %s: %v", cfg.User.Port, err)
 	}
 
-	// PERBAIKAN: Inisialisasi RabbitMQ dengan cara yang benar
-	rabbitURL := fmt.Sprintf("amqp://%s:%s@%s:%s/",
-		cfg.Rabbit.User,
-		cfg.Rabbit.Password,
-		cfg.Rabbit.Host,
-		cfg.Rabbit.Port,
+	companyConn, err := grpc.Dial(
+		fmt.Sprintf("localhost:%s", cfg.Company.Port),
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
 	)
-	publisher, err := eventbus.NewRabbitMQPublisher(rabbitURL)
 	if err != nil {
-		log.Fatalf("Failed to connect to RabbitMQ: %v", err)
+		log.Fatalf("FATAL: failed to connect to company service: %v", err)
 	}
-	defer publisher.Close()
-
-	lis, err := net.Listen("tcp", ":"+cfg.User.Port)
-	if err != nil {
-		log.Fatalln("Failed to listing:", err)
-	}
-
-	fmt.Println("User Svc on", cfg.User.Port)
-
-	storeSvc, err := client.NewStoreClient(cfg)
-	if err != nil {
-		log.Fatalf("Could not connect to store service: %v", err)
-	}
-
-	userRepository := user.NewRepository(db)
-	userService := user.NewService(userRepository, storeSvc, publisher)
-	userGRPCHandler := user.NewGRPCHandler(userService)
+	defer companyConn.Close()
+	companyClient := companyPB.NewCompanyServiceClient(companyConn)
+	log.Println("Successfully connected to Company service.")
 
 	grpcServer := grpc.NewServer()
 
-	userpb.RegisterUserServiceServer(grpcServer, userGRPCHandler)
+	userRepo := user.NewUserRepository(db)
+	userService := user.NewUserService(userRepo, companyClient)
+	// This line should now work correctly as NewUserGRPCHandler is defined in the 'user' package
+	user.NewUserGRPCHandler(grpcServer, userService)
 
+	log.Printf("User service is listening at %v", lis.Addr())
 	if err := grpcServer.Serve(lis); err != nil {
-		log.Fatalln("Failed to serve:", err)
+		log.Fatalf("FATAL: failed to serve gRPC server: %v", err)
 	}
 }

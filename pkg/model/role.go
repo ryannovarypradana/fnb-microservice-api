@@ -1,12 +1,13 @@
-// /pkg/model/role.go
 package model
 
+// CORRECTED: Added the type definition for Role.
+type Role string
+
 const (
-	RoleSuperAdmin = "super_admin"
-	RoleCompanyRep = "company_rep"
-	RoleStoreAdmin = "store_admin"
-	RoleCashier    = "cashier"
-	RoleCustomer   = "customer"
-	// FIX: Adding a general Admin role for simplicity in some routes
-	RoleAdmin = "admin"
+	RoleSuperAdmin Role = "SUPER_ADMIN"
+	RoleCompanyRep Role = "COMPANY_REP"
+	RoleStoreAdmin Role = "STORE_ADMIN"
+	RoleCashier    Role = "CASHIER"
+	RoleCustomer   Role = "CUSTOMER"
+	RoleAdmin      Role = "ADMIN"
 )

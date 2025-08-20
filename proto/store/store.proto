@@ -39,9 +39,42 @@ message GetAllStoresResponse {
     repeated Store stores = 1;
 }
 
+message UpdateStoreRequest {
+    string id = 1;
+    optional string name = 2;
+    optional string address = 3;
+    optional string banner_image_url = 4;
+    optional float tax_percentage = 5;
+    // Untuk struktur kompleks seperti jam operasional,
+    // kita bisa gunakan string JSON atau message terpisah.
+    // Di sini kita gunakan string untuk kesederhanaan.
+    optional string operational_hours = 6; 
+    optional double latitude = 7;
+    optional double longitude = 8;
+}
+
+message DeleteStoreRequest {
+    string id = 1;
+}
+
+message DeleteStoreResponse {
+    string message = 1;
+}
+
+message CloneStoreContentRequest {
+    string source_store_id = 1;
+    string destination_store_id = 2;
+}
+
+message CloneStoreContentResponse {
+    string message = 1;
+}
 
 service StoreService {
     rpc CreateStore(CreateStoreRequest) returns (CreateStoreResponse);
     rpc GetStore(GetStoreRequest) returns (GetStoreResponse);
     rpc GetAllStores(GetAllStoresRequest) returns (GetAllStoresResponse);
+    rpc UpdateStore(UpdateStoreRequest) returns (GetStoreResponse); // Mengembalikan data toko yang diperbarui
+    rpc DeleteStore(DeleteStoreRequest) returns (DeleteStoreResponse);
+    rpc CloneStoreContent(CloneStoreContentRequest) returns (CloneStoreContentResponse);
 }

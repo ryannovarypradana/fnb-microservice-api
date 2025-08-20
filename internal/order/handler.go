@@ -1,5 +1,3 @@
-// internal/order/handler.go
-
 package order
 
 import (
@@ -7,78 +5,103 @@ import (
 
 	pb "github.com/ryannovarypradana/fnb-microservice-api/pkg/grpc/protoc/order"
 	"github.com/ryannovarypradana/fnb-microservice-api/pkg/model"
+	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
 
 type OrderGRPCHandler struct {
 	pb.UnimplementedOrderServiceServer
-	service IService
+	service OrderService
 }
 
-// INILAH FUNGSI YANG HARUS ADA
-func NewOrderGRPCHandler(service IService) *OrderGRPCHandler {
-	return &OrderGRPCHandler{service: service}
+func NewOrderGRPCHandler(grpcServer *grpc.Server, service OrderService) {
+	handler := &OrderGRPCHandler{service: service}
+	pb.RegisterOrderServiceServer(grpcServer, handler)
 }
 
-func (h *OrderGRPCHandler) CreateOrder(ctx context.Context, req *pb.CreateOrderRequest) (*pb.CreateOrderResponse, error) {
-	orderModel := &model.Order{
-		UserID:  uint(req.GetUserId()),
-		StoreID: uint(req.GetStoreId()),
+func mapOrderToResponse(order *model.Order) *pb.OrderResponse {
+	res := &pb.OrderResponse{
+		Id:           order.ID.String(),
+		StoreId:      order.StoreID.String(),
+		TotalAmount:  order.TotalAmount,
+		Status:       string(order.Status),
+		OrderCode:    order.OrderCode,
+		CustomerName: order.CustomerName,
+		TableNumber:  order.TableNumber,
 	}
-
-	var items []*model.OrderItem
-	for _, itemReq := range req.GetItems() {
-		items = append(items, &model.OrderItem{
-			ProductID: uint(itemReq.GetProductId()),
-			Quantity:  int(itemReq.GetQuantity()),
+	if order.UserID != nil {
+		userID := order.UserID.String()
+		res.UserId = userID
+	}
+	for _, item := range order.Items {
+		res.Items = append(res.Items, &pb.OrderItemResponse{
+			ProductId:   item.ProductID.String(),
+			ProductName: item.Menu.Name, // Menggunakan relasi Menu dari GORM
+			Price:       item.Price,
+			Quantity:    int32(item.Quantity),
 		})
 	}
-
-	// Memanggil service dan menampung order yang sudah dibuat
-	createdOrder, err := h.service.CreateOrder(ctx, orderModel, items)
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "Failed to create order: %v", err)
-	}
-
-	return &pb.CreateOrderResponse{
-		Id:          int64(createdOrder.ID),
-		Status:      createdOrder.Status,
-		TotalAmount: createdOrder.TotalAmount,
-	}, nil
+	return res
 }
 
-func (h *OrderGRPCHandler) GetOrder(ctx context.Context, req *pb.GetOrderRequest) (*pb.GetOrderResponse, error) {
-	order, err := h.service.GetOrderByID(ctx, uint(req.GetId()))
+func (h *OrderGRPCHandler) CreateOrder(ctx context.Context, req *pb.CreateOrderRequest) (*pb.OrderResponse, error) {
+	order, err := h.service.CreateOrder(ctx, req)
 	if err != nil {
-		return nil, status.Errorf(codes.NotFound, "Order not found: %v", err)
+		return nil, status.Errorf(codes.Internal, "failed to create order: %v", err)
 	}
+	return mapOrderToResponse(order), nil
+}
 
-	return &pb.GetOrderResponse{
-		Id:          int64(order.ID),
-		UserId:      int64(order.UserID),
-		StoreId:     int64(order.StoreID),
-		TotalAmount: order.TotalAmount,
-		Status:      order.Status,
-	}, nil
+func (h *OrderGRPCHandler) GetOrder(ctx context.Context, req *pb.GetOrderRequest) (*pb.OrderResponse, error) {
+	order, err := h.service.GetOrder(ctx, req)
+	if err != nil {
+		return nil, status.Errorf(codes.NotFound, "order not found: %v", err)
+	}
+	return mapOrderToResponse(order), nil
 }
 
 func (h *OrderGRPCHandler) GetAllOrders(ctx context.Context, req *pb.GetAllOrdersRequest) (*pb.GetAllOrdersResponse, error) {
-	orders, err := h.service.GetAllOrdersByUserID(ctx, uint(req.GetUserId()))
+	// Logika untuk GetAllOrders perlu diimplementasikan di service dan repository
+	return nil, status.Errorf(codes.Unimplemented, "method GetAllOrders not implemented")
+}
+
+func (h *OrderGRPCHandler) CalculateBill(ctx context.Context, req *pb.CalculateBillRequest) (*pb.BillResponse, error) {
+	bill, err := h.service.CalculateBill(ctx, req)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "Failed to get orders: %v", err)
+		return nil, status.Errorf(codes.InvalidArgument, "failed to calculate bill: %v", err)
 	}
+	return bill, nil
+}
 
-	var orderResponses []*pb.GetOrderResponse
-	for _, order := range orders {
-		orderResponses = append(orderResponses, &pb.GetOrderResponse{
-			Id:          int64(order.ID),
-			UserId:      int64(order.UserID),
-			StoreId:     int64(order.StoreID),
-			TotalAmount: order.TotalAmount,
-			Status:      order.Status,
-		})
+func (h *OrderGRPCHandler) CreatePublicOrder(ctx context.Context, req *pb.CreatePublicOrderRequest) (*pb.OrderResponse, error) {
+	order, err := h.service.CreatePublicOrder(ctx, req)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to create public order: %v", err)
 	}
+	return mapOrderToResponse(order), nil
+}
 
-	return &pb.GetAllOrdersResponse{Orders: orderResponses}, nil
+func (h *OrderGRPCHandler) UpdateOrderStatus(ctx context.Context, req *pb.UpdateOrderStatusRequest) (*pb.OrderResponse, error) {
+	order, err := h.service.UpdateOrderStatus(ctx, req)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to update status: %v", err)
+	}
+	return mapOrderToResponse(order), nil
+}
+
+func (h *OrderGRPCHandler) UpdateOrderItems(ctx context.Context, req *pb.UpdateOrderItemsRequest) (*pb.OrderResponse, error) {
+	order, err := h.service.UpdateOrderItems(ctx, req)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to update items: %v", err)
+	}
+	return mapOrderToResponse(order), nil
+}
+
+func (h *OrderGRPCHandler) ConfirmPayment(ctx context.Context, req *pb.ConfirmPaymentRequest) (*pb.OrderResponse, error) {
+	order, err := h.service.ConfirmPayment(ctx, req)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to confirm payment: %v", err)
+	}
+	return mapOrderToResponse(order), nil
 }

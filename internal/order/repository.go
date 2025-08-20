@@ -1,58 +1,54 @@
 package order
 
 import (
+	"context"
+	"errors"
+
 	"github.com/ryannovarypradana/fnb-microservice-api/pkg/model"
 	"gorm.io/gorm"
 )
 
-// IRepository adalah interface untuk order repository
-type IRepository interface {
-	CreateOrderWithItems(order *model.Order, items []*model.OrderItem) error
-	FindOrderByID(orderID uint) (*model.Order, error)
-	FindOrdersByUserID(userID uint) ([]*model.Order, error)
+type OrderRepository interface {
+	Create(ctx context.Context, order *model.Order) error
+	FindByID(ctx context.Context, id string) (*model.Order, error)
+	Update(ctx context.Context, order *model.Order) error
+	FindByCode(ctx context.Context, code string) (*model.Order, error)
 }
 
-type Repository struct {
+type orderRepository struct {
 	db *gorm.DB
 }
 
-func NewOrderRepository(db *gorm.DB) IRepository {
-	return &Repository{db: db}
+func NewOrderRepository(db *gorm.DB) OrderRepository {
+	return &orderRepository{db}
 }
 
-func (r *Repository) CreateOrderWithItems(order *model.Order, items []*model.OrderItem) error {
-	// Memulai transaksi
-	return r.db.Transaction(func(tx *gorm.DB) error {
-		// 1. Simpan order utama untuk mendapatkan ID
-		if err := tx.Create(order).Error; err != nil {
-			return err
-		}
-
-		// 2. Set OrderID untuk setiap item dan simpan
-		for _, item := range items {
-			item.OrderID = order.ID
-			if err := tx.Create(item).Error; err != nil {
-				return err
-			}
-		}
-
-		return nil
-	})
+func (r *orderRepository) Create(ctx context.Context, order *model.Order) error {
+	return r.db.WithContext(ctx).Create(order).Error
 }
 
-func (r *Repository) FindOrderByID(orderID uint) (*model.Order, error) {
+func (r *orderRepository) FindByID(ctx context.Context, id string) (*model.Order, error) {
 	var order model.Order
-	// Preload OrderItems untuk mendapatkan detail item
-	if err := r.db.Preload("OrderItems").First(&order, orderID).Error; err != nil {
+	if err := r.db.WithContext(ctx).Preload("Items.Menu").Where("id = ?", id).First(&order).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, errors.New("order not found")
+		}
 		return nil, err
 	}
 	return &order, nil
 }
 
-func (r *Repository) FindOrdersByUserID(userID uint) ([]*model.Order, error) {
-	var orders []*model.Order
-	if err := r.db.Preload("OrderItems").Where("user_id = ?", userID).Find(&orders).Error; err != nil {
+func (r *orderRepository) Update(ctx context.Context, order *model.Order) error {
+	return r.db.WithContext(ctx).Omit("Items").Save(order).Error
+}
+
+func (r *orderRepository) FindByCode(ctx context.Context, code string) (*model.Order, error) {
+	var order model.Order
+	if err := r.db.WithContext(ctx).Preload("Items.Menu").Where("order_code = ?", code).First(&order).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, errors.New("order not found")
+		}
 		return nil, err
 	}
-	return orders, nil
+	return &order, nil
 }

@@ -24,6 +24,10 @@ const _ = grpc.SupportPackageIsVersion7
 type UserServiceClient interface {
 	GetUser(ctx context.Context, in *GetUserRequest, opts ...grpc.CallOption) (*GetUserResponse, error)
 	RegisterStaff(ctx context.Context, in *RegisterStaffRequest, opts ...grpc.CallOption) (*RegisterStaffResponse, error)
+	// RPC Baru
+	UpdateUser(ctx context.Context, in *UpdateUserRequest, opts ...grpc.CallOption) (*GetUserResponse, error)
+	DeleteUser(ctx context.Context, in *DeleteUserRequest, opts ...grpc.CallOption) (*DeleteUserResponse, error)
+	CreateCompanyWithRep(ctx context.Context, in *CreateCompanyWithRepRequest, opts ...grpc.CallOption) (*CreateCompanyWithRepResponse, error)
 }
 
 type userServiceClient struct {
@@ -52,12 +56,43 @@ func (c *userServiceClient) RegisterStaff(ctx context.Context, in *RegisterStaff
 	return out, nil
 }
 
+func (c *userServiceClient) UpdateUser(ctx context.Context, in *UpdateUserRequest, opts ...grpc.CallOption) (*GetUserResponse, error) {
+	out := new(GetUserResponse)
+	err := c.cc.Invoke(ctx, "/user.UserService/UpdateUser", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *userServiceClient) DeleteUser(ctx context.Context, in *DeleteUserRequest, opts ...grpc.CallOption) (*DeleteUserResponse, error) {
+	out := new(DeleteUserResponse)
+	err := c.cc.Invoke(ctx, "/user.UserService/DeleteUser", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *userServiceClient) CreateCompanyWithRep(ctx context.Context, in *CreateCompanyWithRepRequest, opts ...grpc.CallOption) (*CreateCompanyWithRepResponse, error) {
+	out := new(CreateCompanyWithRepResponse)
+	err := c.cc.Invoke(ctx, "/user.UserService/CreateCompanyWithRep", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // UserServiceServer is the server API for UserService service.
 // All implementations must embed UnimplementedUserServiceServer
 // for forward compatibility
 type UserServiceServer interface {
 	GetUser(context.Context, *GetUserRequest) (*GetUserResponse, error)
 	RegisterStaff(context.Context, *RegisterStaffRequest) (*RegisterStaffResponse, error)
+	// RPC Baru
+	UpdateUser(context.Context, *UpdateUserRequest) (*GetUserResponse, error)
+	DeleteUser(context.Context, *DeleteUserRequest) (*DeleteUserResponse, error)
+	CreateCompanyWithRep(context.Context, *CreateCompanyWithRepRequest) (*CreateCompanyWithRepResponse, error)
 	mustEmbedUnimplementedUserServiceServer()
 }
 
@@ -70,6 +105,15 @@ func (UnimplementedUserServiceServer) GetUser(context.Context, *GetUserRequest) 
 }
 func (UnimplementedUserServiceServer) RegisterStaff(context.Context, *RegisterStaffRequest) (*RegisterStaffResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method RegisterStaff not implemented")
+}
+func (UnimplementedUserServiceServer) UpdateUser(context.Context, *UpdateUserRequest) (*GetUserResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method UpdateUser not implemented")
+}
+func (UnimplementedUserServiceServer) DeleteUser(context.Context, *DeleteUserRequest) (*DeleteUserResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method DeleteUser not implemented")
+}
+func (UnimplementedUserServiceServer) CreateCompanyWithRep(context.Context, *CreateCompanyWithRepRequest) (*CreateCompanyWithRepResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method CreateCompanyWithRep not implemented")
 }
 func (UnimplementedUserServiceServer) mustEmbedUnimplementedUserServiceServer() {}
 
@@ -120,6 +164,60 @@ func _UserService_RegisterStaff_Handler(srv interface{}, ctx context.Context, de
 	return interceptor(ctx, in, info, handler)
 }
 
+func _UserService_UpdateUser_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateUserRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(UserServiceServer).UpdateUser(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/user.UserService/UpdateUser",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(UserServiceServer).UpdateUser(ctx, req.(*UpdateUserRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _UserService_DeleteUser_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteUserRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(UserServiceServer).DeleteUser(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/user.UserService/DeleteUser",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(UserServiceServer).DeleteUser(ctx, req.(*DeleteUserRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _UserService_CreateCompanyWithRep_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreateCompanyWithRepRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(UserServiceServer).CreateCompanyWithRep(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/user.UserService/CreateCompanyWithRep",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(UserServiceServer).CreateCompanyWithRep(ctx, req.(*CreateCompanyWithRepRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // UserService_ServiceDesc is the grpc.ServiceDesc for UserService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -134,6 +232,18 @@ var UserService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "RegisterStaff",
 			Handler:    _UserService_RegisterStaff_Handler,
+		},
+		{
+			MethodName: "UpdateUser",
+			Handler:    _UserService_UpdateUser_Handler,
+		},
+		{
+			MethodName: "DeleteUser",
+			Handler:    _UserService_DeleteUser_Handler,
+		},
+		{
+			MethodName: "CreateCompanyWithRep",
+			Handler:    _UserService_CreateCompanyWithRep_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

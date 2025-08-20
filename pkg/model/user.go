@@ -1,4 +1,3 @@
-// pkg/model/user.go
 package model
 
 import (
@@ -7,19 +6,18 @@ import (
 )
 
 type User struct {
-	ID       uuid.UUID `json:"id" gorm:"type:uuid;primary_key;"`
-	Name     string    `json:"name" gorm:"type:varchar(255);not null"`
-	Email    string    `json:"email" gorm:"type:varchar(255);not null;unique"`
-	Password string    `json:"-" gorm:"type:varchar(255);not null"`
-	Role     string    `json:"role" gorm:"type:varchar(50);not null"`
-
-	// Relasi untuk multi-tenancy
+	ID        uuid.UUID  `json:"id" gorm:"type:uuid;primary_key;"`
 	CompanyID *uuid.UUID `json:"company_id,omitempty" gorm:"type:uuid"`
 	StoreID   *uuid.UUID `json:"store_id,omitempty" gorm:"type:uuid"`
+	Name      string     `json:"name" gorm:"type:varchar(255);not null"`
+	Email     string     `json:"email" gorm:"type:varchar(255);not null;unique"`
+	Password  string     `json:"-" gorm:"not null"`
+	// CORRECTED: The type is now model.Role, not string.
+	Role Role `json:"role" gorm:"type:varchar(50);not null"`
 
-	// Associations (opsional, untuk kemudahan query)
-	Company *Company `json:"-" gorm:"foreignkey:CompanyID"`
-	Store   *Store   `json:"-" gorm:"foreignkey:StoreID"`
+	// Relasi
+	Company Company `json:"-" gorm:"foreignKey:CompanyID"`
+	Store   Store   `json:"-" gorm:"foreignKey:StoreID"`
 
 	DeletedAt gorm.DeletedAt `json:"-" gorm:"index"`
 }
@@ -28,8 +26,9 @@ func (u *User) BeforeCreate(tx *gorm.DB) (err error) {
 	if u.ID == uuid.Nil {
 		u.ID = uuid.New()
 	}
-	// Default role jika tidak diset
+	// Set default role if not provided
 	if u.Role == "" {
+		// This assignment is now valid because both sides are of type model.Role
 		u.Role = RoleCustomer
 	}
 	return

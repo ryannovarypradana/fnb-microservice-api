@@ -1,5 +1,3 @@
-// cmd/order-service/main.go
-
 package main
 
 import (
@@ -7,45 +5,60 @@ import (
 	"log"
 	"net"
 
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
+
 	"github.com/ryannovarypradana/fnb-microservice-api/config"
 	"github.com/ryannovarypradana/fnb-microservice-api/internal/order"
 	"github.com/ryannovarypradana/fnb-microservice-api/pkg/database"
-	"github.com/ryannovarypradana/fnb-microservice-api/pkg/grpc/client"
-	orderpb "github.com/ryannovarypradana/fnb-microservice-api/pkg/grpc/protoc/order"
-	"google.golang.org/grpc"
+	productPB "github.com/ryannovarypradana/fnb-microservice-api/pkg/grpc/protoc/product"
+	storePB "github.com/ryannovarypradana/fnb-microservice-api/pkg/grpc/protoc/store"
 )
 
 func main() {
 	cfg := config.Get()
+	if cfg == nil {
+		log.Fatalf("FATAL: could not load config")
+	}
 
 	db, err := database.NewPostgres(cfg)
 	if err != nil {
-		log.Fatalf("Failed to connect to database: %v", err)
+		log.Fatalf("FATAL: failed to connect to database: %v", err)
 	}
+	log.Println("Database connection successful.")
 
-	lis, err := net.Listen("tcp", ":"+cfg.Order.Port)
+	// Membuat koneksi klien gRPC ke service lain
+	productConn, err := grpc.Dial(fmt.Sprintf("localhost:%s", cfg.Product.Port), grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
-		log.Fatalln("Failed to listing:", err)
+		log.Fatalf("FATAL: failed to connect to product service: %v", err)
 	}
+	defer productConn.Close()
+	productClient := productPB.NewProductServiceClient(productConn)
+	log.Println("Successfully connected to Product service.")
 
-	fmt.Println("Order Svc on", cfg.Order.Port)
-
-	productSvc, err := client.NewProductClient(cfg)
+	storeConn, err := grpc.Dial(fmt.Sprintf("localhost:%s", cfg.Store.Port), grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
-		log.Fatalf("Could not connect to product service: %v", err)
+		log.Fatalf("FATAL: failed to connect to store service: %v", err)
 	}
+	defer storeConn.Close()
+	storeClient := storePB.NewStoreServiceClient(storeConn)
+	log.Println("Successfully connected to Store service.")
 
-	orderRepository := order.NewOrderRepository(db)
-	orderService := order.NewOrderService(orderRepository, productSvc)
-
-	// DI SINILAH PEMANGGILAN ITU TERJADI
-	orderGRPCHandler := order.NewOrderGRPCHandler(orderService)
+	// Menyiapkan server gRPC untuk service ini
+	lis, err := net.Listen("tcp", fmt.Sprintf(":%s", cfg.Order.Port))
+	if err != nil {
+		log.Fatalf("FATAL: failed to listen on port %s: %v", cfg.Order.Port, err)
+	}
 
 	grpcServer := grpc.NewServer()
 
-	orderpb.RegisterOrderServiceServer(grpcServer, orderGRPCHandler)
+	// Inisialisasi dari paket 'order'
+	orderRepo := order.NewOrderRepository(db)
+	orderService := order.NewOrderService(orderRepo, db, productClient, storeClient)
+	order.NewOrderGRPCHandler(grpcServer, orderService)
 
+	log.Printf("Order service is listening at %v", lis.Addr())
 	if err := grpcServer.Serve(lis); err != nil {
-		log.Fatalln("Failed to serve:", err)
+		log.Fatalf("FATAL: failed to serve gRPC server: %v", err)
 	}
 }

@@ -1,5 +1,3 @@
-// pkg/middleware/auth.go
-
 package middleware
 
 import (
@@ -7,10 +5,13 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/ryannovarypradana/fnb-microservice-api/config"
-	"github.com/ryannovarypradana/fnb-microservice-api/pkg/utils" // <-- Hapus alias 'util'
+	"github.com/ryannovarypradana/fnb-microservice-api/pkg/utils"
 )
 
 func AuthMiddleware(cfg *config.Config) fiber.Handler {
+	// 1. Buat instance JwtService di sini.
+	jwtService := utils.NewJwtService(cfg)
+
 	return func(c *fiber.Ctx) error {
 		authHeader := c.Get("Authorization")
 		if authHeader == "" {
@@ -23,8 +24,10 @@ func AuthMiddleware(cfg *config.Config) fiber.Handler {
 		}
 
 		tokenString := parts[1]
-		// Panggil utils.VerifyJWT, bukan util.VerifyJWT
-		claims, err := utils.VerifyJWT(tokenString, cfg.App.JWTSecret)
+
+		// 2. Panggil method VerifyToken() dari instance jwtService.
+		//    Perhatikan bahwa kita tidak perlu lagi memberikan secret, karena sudah disimpan di dalam jwtService.
+		claims, err := jwtService.VerifyToken(tokenString)
 		if err != nil {
 			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Invalid token"})
 		}

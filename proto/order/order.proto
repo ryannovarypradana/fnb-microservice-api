@@ -4,54 +4,96 @@ package order;
 
 option go_package = "./pkg/grpc/protoc/order";
 
-// Item di dalam pesanan
 message OrderItemRequest {
-  int64 product_id = 1; // Menggunakan int64
+  string product_id = 1; // ID produk
   int32 quantity = 2;
 }
 
-// Request untuk membuat pesanan
+message OrderItemResponse {
+  string product_id = 1;
+  string product_name = 2; // Untuk kemudahan response
+  double price = 3;
+  int32 quantity = 4;
+}
+
+// --- PESAN BARU ---
+
+message CalculateBillRequest {
+  string store_id = 1;
+  repeated OrderItemRequest items = 2;
+  optional string voucher_code = 3;
+}
+
+message BillResponse {
+  double subtotal = 1;
+  double tax = 2;
+  double discount = 3;
+  double total_amount = 4;
+}
+
 message CreateOrderRequest {
-  int64 user_id = 1;   // Menggunakan int64
-  int64 store_id = 2;  // Menambahkan store_id
+  string user_id = 1;
+  string store_id = 2;
   repeated OrderItemRequest items = 3;
 }
 
-// Response setelah membuat pesanan
-message CreateOrderResponse {
-  int64 id = 1; // Menambahkan field ID
-  string status = 2;
-  double total_amount = 3;
+message CreatePublicOrderRequest {
+    string store_code = 1;
+    string customer_name = 2;
+    string table_number = 3;
+    repeated OrderItemRequest items = 4;
 }
 
-// Request untuk mendapatkan detail pesanan
-message GetOrderRequest {
-  int64 id = 1; // Menggunakan int64
+message OrderResponse {
+    string id = 1;
+    string user_id = 2;
+    string store_id = 3;
+    double total_amount = 4;
+    string status = 5;
+    string order_code = 6;
+    repeated OrderItemResponse items = 7;
+    string customer_name = 8;
+    string table_number = 9;
 }
 
-// Response detail pesanan
-message GetOrderResponse {
-  int64 id = 1;
-  int64 user_id = 2;
-  int64 store_id = 3;
-  double total_amount = 4;
-  string status = 5;
-  // Kita bisa tambahkan detail item di sini jika perlu
+message ConfirmPaymentRequest {
+    string order_code = 1;
 }
 
-// Request untuk mendapatkan semua pesanan user
-message GetAllOrdersRequest {
-    int64 user_id = 1;
+message UpdateOrderStatusRequest {
+    string id = 1; // ID Pesanan
+    string status = 2; // Status baru (e.g., "PAID", "CANCELED")
 }
 
-// Response untuk semua pesanan user
-message GetAllOrdersResponse {
-    repeated GetOrderResponse orders = 1;
+message UpdateOrderItemsRequest {
+    string id = 1; // ID Pesanan
+    repeated OrderItemRequest items = 2;
 }
 
+// --- SERVICE YANG DIPERBARUI ---
 
 service OrderService {
-  rpc CreateOrder(CreateOrderRequest) returns (CreateOrderResponse);
-  rpc GetOrder(GetOrderRequest) returns (GetOrderResponse);
+  rpc CreateOrder(CreateOrderRequest) returns (OrderResponse);
+  rpc GetOrder(GetOrderRequest) returns (OrderResponse);
   rpc GetAllOrders(GetAllOrdersRequest) returns (GetAllOrdersResponse);
+
+  // RPC Baru
+  rpc CalculateBill(CalculateBillRequest) returns (BillResponse);
+  rpc CreatePublicOrder(CreatePublicOrderRequest) returns (OrderResponse);
+  rpc UpdateOrderStatus(UpdateOrderStatusRequest) returns (OrderResponse);
+  rpc UpdateOrderItems(UpdateOrderItemsRequest) returns (OrderResponse);
+  rpc ConfirmPayment(ConfirmPaymentRequest) returns (OrderResponse);
+}
+
+// Pesan yang sudah ada
+message GetOrderRequest {
+  string id = 1;
+}
+
+message GetAllOrdersRequest {
+    string user_id = 1;
+}
+
+message GetAllOrdersResponse {
+    repeated OrderResponse orders = 1;
 }

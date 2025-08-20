@@ -1,5 +1,3 @@
-// cmd/store-service/main.go
-
 package main
 
 import (
@@ -7,44 +5,50 @@ import (
 	"log"
 	"net"
 
+	"google.golang.org/grpc"
+
 	"github.com/ryannovarypradana/fnb-microservice-api/config"
 	"github.com/ryannovarypradana/fnb-microservice-api/internal/store"
 	"github.com/ryannovarypradana/fnb-microservice-api/pkg/database"
-	"github.com/ryannovarypradana/fnb-microservice-api/pkg/grpc/client"
-	storepb "github.com/ryannovarypradana/fnb-microservice-api/pkg/grpc/protoc/store"
-	"google.golang.org/grpc"
 )
 
 func main() {
+	// Memuat konfigurasi dari file .env
+	// CORRECTED: Called config.Get() instead of config.LoadConfig()
 	cfg := config.Get()
+	if cfg == nil {
+		log.Fatalf("FATAL: could not load config")
+	}
 
+	// Menghubungkan ke database PostgreSQL
+	// CORRECTED: Called database.NewPostgres() instead of database.NewPostgresDB()
 	db, err := database.NewPostgres(cfg)
 	if err != nil {
-		log.Fatalf("Failed to connect to database: %v", err)
+		log.Fatalf("FATAL: failed to connect to database: %v", err)
 	}
+	log.Println("Database connection successful.")
 
-	lis, err := net.Listen("tcp", ":"+cfg.Store.Port)
+	// Membuat listener untuk koneksi gRPC
+	lis, err := net.Listen("tcp", fmt.Sprintf(":%s", cfg.Store.Port))
 	if err != nil {
-		log.Fatalln("Failed to listing:", err)
+		log.Fatalf("FATAL: failed to listen on port %s: %v", cfg.Store.Port, err)
 	}
 
-	fmt.Println("Store Svc on", cfg.Store.Port)
-
-	companySvc, err := client.NewCompanyClient(cfg)
-	if err != nil {
-		log.Fatalf("Could not connect to company service: %v", err)
-	}
-
-	// PERBAIKAN: Menggunakan nama fungsi yang benar dari package 'internal/store'
-	storeRepository := store.NewRepository(db)
-	storeService := store.NewService(storeRepository, companySvc)
-	storeGRPCHandler := store.NewGRPCHandler(storeService)
-
+	// Membuat server gRPC baru
 	grpcServer := grpc.NewServer()
 
-	storepb.RegisterStoreServiceServer(grpcServer, storeGRPCHandler)
+	// Inisialisasi dan wiring dependensi dari paket 'store'
+	// 1. Buat repository
+	storeRepo := store.NewStoreRepository(db)
+	// 2. Buat service dengan repository
+	storeService := store.NewStoreService(storeRepo)
+	// 3. Daftarkan handler gRPC dengan service
+	store.NewStoreGRPCHandler(grpcServer, storeService)
 
+	log.Printf("Store service is listening at %v", lis.Addr())
+
+	// Mulai melayani request gRPC
 	if err := grpcServer.Serve(lis); err != nil {
-		log.Fatalln("Failed to serve:", err)
+		log.Fatalf("FATAL: failed to serve gRPC server: %v", err)
 	}
 }

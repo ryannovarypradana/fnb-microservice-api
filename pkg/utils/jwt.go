@@ -1,17 +1,36 @@
-// pkg/utils/jwt.go
-
 package utils
 
 import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/ryannovarypradana/fnb-microservice-api/pkg/model" // <-- Gunakan model
+	"github.com/google/uuid"
+	"github.com/ryannovarypradana/fnb-microservice-api/config"
+	"github.com/ryannovarypradana/fnb-microservice-api/pkg/model"
 )
 
-func GenerateJWT(userID, role, secret string) (string, error) {
+// JwtService adalah interface untuk operasi JWT.
+type JwtService interface {
+	GenerateToken(userID uuid.UUID, role string) (string, error)
+	VerifyToken(tokenString string) (*model.Claims, error)
+}
+
+// jwtService adalah implementasi dari JwtService.
+type jwtService struct {
+	secret string
+}
+
+// NewJwtService adalah konstruktor untuk jwtService.
+func NewJwtService(cfg *config.Config) JwtService {
+	return &jwtService{
+		secret: cfg.App.JWTSecret,
+	}
+}
+
+// GenerateToken sekarang adalah sebuah method.
+func (s *jwtService) GenerateToken(userID uuid.UUID, role string) (string, error) {
 	claims := model.Claims{
-		UserID: userID,
+		UserID: userID.String(), // Menggunakan String() dari UUID
 		Role:   role,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Hour * 24)),
@@ -20,12 +39,13 @@ func GenerateJWT(userID, role, secret string) (string, error) {
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	return token.SignedString([]byte(secret))
+	return token.SignedString([]byte(s.secret))
 }
 
-func VerifyJWT(tokenString, secret string) (*model.Claims, error) {
+// VerifyToken sekarang adalah sebuah method.
+func (s *jwtService) VerifyToken(tokenString string) (*model.Claims, error) {
 	token, err := jwt.ParseWithClaims(tokenString, &model.Claims{}, func(token *jwt.Token) (interface{}, error) {
-		return []byte(secret), nil
+		return []byte(s.secret), nil
 	})
 
 	if err != nil {
