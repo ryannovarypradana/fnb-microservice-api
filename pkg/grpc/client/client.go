@@ -1,128 +1,71 @@
+// pkg/grpc/client/client.go
+
 package client
 
 import (
-	"log"
+	"fmt"
 
-	authPb "github.com/ryannovarypradana/fnb-microservice-api/pkg/grpc/protoc/auth"
-	companyPb "github.com/ryannovarypradana/fnb-microservice-api/pkg/grpc/protoc/company"
-	orderPb "github.com/ryannovarypradana/fnb-microservice-api/pkg/grpc/protoc/order"
-	productPb "github.com/ryannovarypradana/fnb-microservice-api/pkg/grpc/protoc/product"
-	storePb "github.com/ryannovarypradana/fnb-microservice-api/pkg/grpc/protoc/store"
-	userPb "github.com/ryannovarypradana/fnb-microservice-api/pkg/grpc/protoc/user"
+	"github.com/ryannovarypradana/fnb-microservice-api/config"
+	"github.com/ryannovarypradana/fnb-microservice-api/pkg/grpc/protoc/auth"
+	"github.com/ryannovarypradana/fnb-microservice-api/pkg/grpc/protoc/company"
+	"github.com/ryannovarypradana/fnb-microservice-api/pkg/grpc/protoc/order"   // <-- IMPORT DITAMBAHKAN
+	"github.com/ryannovarypradana/fnb-microservice-api/pkg/grpc/protoc/product" // <-- IMPORT DITAMBAHKAN
+	"github.com/ryannovarypradana/fnb-microservice-api/pkg/grpc/protoc/store"
+	"github.com/ryannovarypradana/fnb-microservice-api/pkg/grpc/protoc/user"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
 
-// --- Auth Service Client ---
-type IAuthServiceClient interface {
-	GetAuthServiceClient() authPb.AuthServiceClient
-}
-type AuthServiceClient struct {
-	Client authPb.AuthServiceClient
-}
-
-func NewAuthServiceClient(port string) IAuthServiceClient {
-	conn, err := grpc.Dial("localhost:"+port, grpc.WithTransportCredentials(insecure.NewCredentials()))
+func NewAuthClient(cfg *config.Config) (auth.AuthServiceClient, error) {
+	addr := fmt.Sprintf("localhost:%s", cfg.Auth.Port)
+	conn, err := grpc.Dial(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
-		log.Fatalf("Could not connect to auth service: %v", err)
+		return nil, fmt.Errorf("failed to dial auth service: %w", err)
 	}
-	return &AuthServiceClient{Client: authPb.NewAuthServiceClient(conn)}
-}
-func (c *AuthServiceClient) GetAuthServiceClient() authPb.AuthServiceClient {
-	return c.Client
+	return auth.NewAuthServiceClient(conn), nil
 }
 
-// --- Product Service Client ---
-type IProductServiceClient interface {
-	GetProductServiceClient() productPb.ProductServiceClient
-}
-type ProductServiceClient struct {
-	Client productPb.ProductServiceClient
-}
-
-func NewProductServiceClient(port string) IProductServiceClient {
-	conn, err := grpc.Dial("localhost:"+port, grpc.WithTransportCredentials(insecure.NewCredentials()))
+func NewUserClient(cfg *config.Config) (user.UserServiceClient, error) {
+	addr := fmt.Sprintf("localhost:%s", cfg.User.Port)
+	conn, err := grpc.Dial(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
-		log.Fatalf("Could not connect to product service: %v", err)
+		return nil, fmt.Errorf("failed to dial user service: %w", err)
 	}
-	return &ProductServiceClient{Client: productPb.NewProductServiceClient(conn)}
-}
-func (p *ProductServiceClient) GetProductServiceClient() productPb.ProductServiceClient {
-	return p.Client
+	return user.NewUserServiceClient(conn), nil
 }
 
-// --- Order Service Client (Perbaikan Kunci di Sini) ---
-type IOrderServiceClient interface {
-	GetOrderServiceClient() orderPb.OrderServiceClient
-}
-type OrderServiceClient struct {
-	Client orderPb.OrderServiceClient
-}
-
-func NewOrderServiceClient(port string) IOrderServiceClient {
-	conn, err := grpc.Dial("localhost:"+port, grpc.WithTransportCredentials(insecure.NewCredentials()))
+func NewCompanyClient(cfg *config.Config) (company.CompanyServiceClient, error) {
+	addr := fmt.Sprintf("localhost:%s", cfg.Company.Port)
+	conn, err := grpc.Dial(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
-		log.Fatalf("Could not connect to order service: %v", err)
+		return nil, fmt.Errorf("failed to dial company service: %w", err)
 	}
-	return &OrderServiceClient{Client: orderPb.NewOrderServiceClient(conn)}
-}
-func (o *OrderServiceClient) GetOrderServiceClient() orderPb.OrderServiceClient {
-	return o.Client
+	return company.NewCompanyServiceClient(conn), nil
 }
 
-// --- User Service Client ---
-type IUserServiceClient interface {
-	GetUserServiceClient() userPb.UserServiceClient
-}
-type UserServiceClient struct {
-	Client userPb.UserServiceClient
-}
-
-func NewUserServiceClient(port string) IUserServiceClient {
-	conn, err := grpc.Dial("localhost:"+port, grpc.WithTransportCredentials(insecure.NewCredentials()))
+func NewStoreClient(cfg *config.Config) (store.StoreServiceClient, error) {
+	addr := fmt.Sprintf("localhost:%s", cfg.Store.Port)
+	conn, err := grpc.Dial(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
-		log.Fatalf("Could not connect to user service: %v", err)
+		return nil, fmt.Errorf("failed to dial store service: %w", err)
 	}
-	return &UserServiceClient{Client: userPb.NewUserServiceClient(conn)}
-}
-func (u *UserServiceClient) GetUserServiceClient() userPb.UserServiceClient {
-	return u.Client
+	return store.NewStoreServiceClient(conn), nil
 }
 
-// --- Store Service Client ---
-type IStoreServiceClient interface {
-	GetStoreServiceClient() storePb.StoreServiceClient
-}
-type StoreServiceClient struct {
-	Client storePb.StoreServiceClient
-}
-
-func NewStoreServiceClient(port string) IStoreServiceClient {
-	conn, err := grpc.Dial("localhost:"+port, grpc.WithTransportCredentials(insecure.NewCredentials()))
+func NewProductClient(cfg *config.Config) (product.ProductServiceClient, error) {
+	addr := fmt.Sprintf("localhost:%s", cfg.Product.Port)
+	conn, err := grpc.Dial(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
-		log.Fatalf("Could not connect to store service: %v", err)
+		return nil, fmt.Errorf("failed to dial product service: %w", err)
 	}
-	return &StoreServiceClient{Client: storePb.NewStoreServiceClient(conn)}
-}
-func (s *StoreServiceClient) GetStoreServiceClient() storePb.StoreServiceClient {
-	return s.Client
+	return product.NewProductServiceClient(conn), nil
 }
 
-// --- Company Service Client ---
-type ICompanyServiceClient interface {
-	GetCompanyServiceClient() companyPb.CompanyServiceClient
-}
-type CompanyServiceClient struct {
-	Client companyPb.CompanyServiceClient
-}
-
-func NewCompanyServiceClient(port string) ICompanyServiceClient {
-	conn, err := grpc.Dial("localhost:"+port, grpc.WithTransportCredentials(insecure.NewCredentials()))
+func NewOrderClient(cfg *config.Config) (order.OrderServiceClient, error) {
+	addr := fmt.Sprintf("localhost:%s", cfg.Order.Port)
+	conn, err := grpc.Dial(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
-		log.Fatalf("Could not connect to company service: %v", err)
+		return nil, fmt.Errorf("failed to dial order service: %w", err)
 	}
-	return &CompanyServiceClient{Client: companyPb.NewCompanyServiceClient(conn)}
-}
-func (c *CompanyServiceClient) GetCompanyServiceClient() companyPb.CompanyServiceClient {
-	return c.Client
+	return order.NewOrderServiceClient(conn), nil
 }

@@ -15,6 +15,7 @@ type Config struct {
 	Store   GRPCConfig
 	Product GRPCConfig
 	Order   GRPCConfig
+	Company GRPCConfig
 	Redis   RedisConfig
 	Rabbit  RabbitMQConfig
 }
@@ -85,6 +86,9 @@ func Get() *Config {
 		},
 		Order: GRPCConfig{
 			Port: os.Getenv("ORDER_SERVICE_PORT"),
+		},
+		Company: GRPCConfig{ // <-- ADD THIS BLOCK
+			Port: os.Getenv("COMPANY_SERVICE_PORT"),
 		},
 		Redis: RedisConfig{
 			Host:     os.Getenv("REDIS_HOST"),

@@ -1,78 +1,63 @@
+// cmd/user-service/main.go
+
 package main
 
 import (
 	"fmt"
 	"log"
 	"net"
-	"os"
 
-	"github.com/joho/godotenv"
 	"github.com/ryannovarypradana/fnb-microservice-api/config"
-	internalUser "github.com/ryannovarypradana/fnb-microservice-api/internal/user"
+	"github.com/ryannovarypradana/fnb-microservice-api/internal/user"
 	"github.com/ryannovarypradana/fnb-microservice-api/pkg/database"
-
-	// FIX: Correctly import the eventbus package
 	"github.com/ryannovarypradana/fnb-microservice-api/pkg/eventbus"
 	"github.com/ryannovarypradana/fnb-microservice-api/pkg/grpc/client"
-	userPB "github.com/ryannovarypradana/fnb-microservice-api/pkg/grpc/protoc/user"
-	"github.com/ryannovarypradana/fnb-microservice-api/pkg/model"
+	userpb "github.com/ryannovarypradana/fnb-microservice-api/pkg/grpc/protoc/user"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/reflection"
 )
 
 func main() {
-	log.Println("Starting User Service...")
-
-	if os.Getenv("APP_ENV") != "production" {
-		err := godotenv.Load()
-		if err != nil {
-			log.Fatalf("Error loading .env file: %v", err)
-		}
-	}
 	cfg := config.Get()
-	// Perbaikan di sini: Teruskan cfg ke NewPostgres
+
 	db, err := database.NewPostgres(cfg)
 	if err != nil {
-		log.Fatalf("failed to connect to database: %v", err)
+		log.Fatalf("Failed to connect to database: %v", err)
 	}
 
-	if err := db.AutoMigrate(&model.User{}); err != nil {
-		log.Fatalf("failed to migrate database: %v", err)
-	}
-
-	// Initialize gRPC client for other services
-	storeClient := client.NewStoreClient()
-
-	// Initialize RabbitMQ Publisher
-	rabbitMQURL := os.Getenv("RABBITMQ_URL")
-	// FIX: Use the correct package name to call the function
-	publisher, err := eventbus.NewRabbitMQPublisher(rabbitMQURL)
+	// PERBAIKAN: Inisialisasi RabbitMQ dengan cara yang benar
+	rabbitURL := fmt.Sprintf("amqp://%s:%s@%s:%s/",
+		cfg.Rabbit.User,
+		cfg.Rabbit.Password,
+		cfg.Rabbit.Host,
+		cfg.Rabbit.Port,
+	)
+	publisher, err := eventbus.NewRabbitMQPublisher(rabbitURL)
 	if err != nil {
-		log.Fatalf("failed to connect to RabbitMQ: %v", err)
+		log.Fatalf("Failed to connect to RabbitMQ: %v", err)
 	}
 	defer publisher.Close()
 
-	// Inject all dependencies into the service
-	userRepo := internalUser.NewRepository(db)
-	userService := internalUser.NewService(userRepo, storeClient, publisher)
-	userHandler := internalUser.NewGRPCHandler(userService)
-
-	port := os.Getenv("USER_SERVICE_PORT")
-	if port == "" {
-		port = "50052"
-	}
-
-	lis, err := net.Listen("tcp", fmt.Sprintf(":%s", port))
+	lis, err := net.Listen("tcp", ":"+cfg.User.Port)
 	if err != nil {
-		log.Fatalf("failed to listen: %v", err)
+		log.Fatalln("Failed to listing:", err)
 	}
+
+	fmt.Println("User Svc on", cfg.User.Port)
+
+	storeSvc, err := client.NewStoreClient(cfg)
+	if err != nil {
+		log.Fatalf("Could not connect to store service: %v", err)
+	}
+
+	userRepository := user.NewRepository(db)
+	userService := user.NewService(userRepository, storeSvc, publisher)
+	userGRPCHandler := user.NewGRPCHandler(userService)
 
 	grpcServer := grpc.NewServer()
-	userPB.RegisterUserServiceServer(grpcServer, userHandler)
-	reflection.Register(grpcServer)
 
-	log.Printf("User gRPC server listening on port %s", port)
+	userpb.RegisterUserServiceServer(grpcServer, userGRPCHandler)
+
 	if err := grpcServer.Serve(lis); err != nil {
-		log.Fatalf("failed to serve gRPC: %v", err)
+		log.Fatalln("Failed to serve:", err)
 	}
 }

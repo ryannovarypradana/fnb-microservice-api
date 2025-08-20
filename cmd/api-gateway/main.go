@@ -1,57 +1,73 @@
-// /cmd/api-gateway/main.go
+// cmd/api-gateway/main.go
+
 package main
 
 import (
 	"log"
-	"os"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2/middleware/logger"
-	"github.com/joho/godotenv"
+	"github.com/ryannovarypradana/fnb-microservice-api/config"
+	"github.com/ryannovarypradana/fnb-microservice-api/internal/router"
 	"github.com/ryannovarypradana/fnb-microservice-api/pkg/grpc/client"
 	"github.com/ryannovarypradana/fnb-microservice-api/pkg/grpc/handler"
-	"github.com/ryannovarypradana/fnb-microservice-api/pkg/middleware"
-	"github.com/ryannovarypradana/fnb-microservice-api/pkg/model"
 )
 
 func main() {
-	if err := godotenv.Load(); err != nil {
-		log.Println("No .env file found.")
+	// 1. INISIALISASI
+	cfg := config.Get()
+
+	authSvc, err := client.NewAuthClient(cfg)
+	if err != nil {
+		log.Fatalf("Could not connect to auth service: %v", err)
+	}
+
+	userSvc, err := client.NewUserClient(cfg)
+	if err != nil {
+		log.Fatalf("Could not connect to user service: %v", err)
+	}
+
+	storeSvc, err := client.NewStoreClient(cfg)
+	if err != nil {
+		log.Fatalf("Could not connect to store service: %v", err)
+	}
+
+	productSvc, err := client.NewProductClient(cfg)
+	if err != nil {
+		log.Fatalf("Could not connect to product service: %v", err)
+	}
+
+	orderSvc, err := client.NewOrderClient(cfg)
+	if err != nil {
+		log.Fatalf("Could not connect to order service: %v", err)
+	}
+
+	companySvc, err := client.NewCompanyClient(cfg) // <-- Inisialisasi Company Client
+	if err != nil {
+		log.Fatalf("Could not connect to company service: %v", err)
 	}
 
 	app := fiber.New()
 	app.Use(logger.New())
 	app.Use(cors.New())
 
-	// === Initialize gRPC Clients ===
-	authClient := client.NewAuthClient()
-	userClient := client.NewUserClient()
-	// ... other clients
-
-	// === Initialize Handlers ===
-	authHandler := handler.NewAuthHandler(authClient)
-	// FIX: Initialize the userHandler using the userClient
-	userHandler := handler.NewUserHandler(userClient)
-	// ... other handlers
-
-	// === Setup Routes ===
-	api := app.Group("/api")
-
-	// --- Public Routes ---
-	api.Post("/auth/register", authHandler.Register)
-	api.Post("/auth/login", authHandler.Login)
-
-	// --- Authenticated Routes ---
-	authRequired := api.Group("", middleware.AuthMiddleware)
-
-	// FIX: Use the initialized userHandler and the correct Role constant
-	authRequired.Get("/users/:id", middleware.RoleMiddleware(model.RoleSuperAdmin), userHandler.GetUser)
-
-	// === Start Server ===
-	port := os.Getenv("API_GATEWAY_PORT")
-	if port == "" {
-		port = "3000"
+	// Kumpulkan semua handler
+	handlers := &handler.Handlers{
+		Auth:    handler.NewAuthHandler(authSvc),
+		User:    handler.NewUserHandler(userSvc),
+		Store:   handler.NewStoreHandler(storeSvc),
+		Product: handler.NewProductHandler(productSvc),
+		Order:   handler.NewOrderHandler(orderSvc),
+		Company: handler.NewCompanyHandler(companySvc), // <-- Tambahkan Company Handler
 	}
-	log.Fatal(app.Listen(":" + port))
+
+	// 2. SETUP ROUTE
+	router.SetupRoutes(app, cfg, handlers)
+
+	// 3. JALANKAN SERVER
+	log.Printf("Starting API Gateway on port %s", cfg.App.Port)
+	if err := app.Listen(":" + cfg.App.Port); err != nil {
+		log.Fatalf("Failed to run server: %v", err)
+	}
 }

@@ -1,3 +1,5 @@
+// internal/order/handler.go
+
 package order
 
 import (
@@ -14,12 +16,13 @@ type OrderGRPCHandler struct {
 	service IService
 }
 
+// INILAH FUNGSI YANG HARUS ADA
 func NewOrderGRPCHandler(service IService) *OrderGRPCHandler {
 	return &OrderGRPCHandler{service: service}
 }
 
 func (h *OrderGRPCHandler) CreateOrder(ctx context.Context, req *pb.CreateOrderRequest) (*pb.CreateOrderResponse, error) {
-	order := &model.Order{
+	orderModel := &model.Order{
 		UserID:  uint(req.GetUserId()),
 		StoreID: uint(req.GetStoreId()),
 	}
@@ -32,14 +35,16 @@ func (h *OrderGRPCHandler) CreateOrder(ctx context.Context, req *pb.CreateOrderR
 		})
 	}
 
-	if err := h.service.CreateOrder(ctx, order, items); err != nil {
+	// Memanggil service dan menampung order yang sudah dibuat
+	createdOrder, err := h.service.CreateOrder(ctx, orderModel, items)
+	if err != nil {
 		return nil, status.Errorf(codes.Internal, "Failed to create order: %v", err)
 	}
 
 	return &pb.CreateOrderResponse{
-		Id:          int64(order.ID),
-		Status:      order.Status,
-		TotalAmount: order.TotalAmount,
+		Id:          int64(createdOrder.ID),
+		Status:      createdOrder.Status,
+		TotalAmount: createdOrder.TotalAmount,
 	}, nil
 }
 
