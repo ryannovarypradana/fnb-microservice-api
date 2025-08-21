@@ -58,3 +58,9 @@ docker-down:
 docker-infra:
 	@echo "--- Starting infrastructure containers ---"
 	docker-compose up -d postgres redis rabbitmq
+
+.PHONY: proto
+proto:
+	rm -rf pkg/grpc/protoc
+	mkdir -p pkg/grpc/protoc
+	protoc -I=proto --go_out=. --go-grpc_out=. proto/**/*.proto # <-- Perintah yang benar ada di sini

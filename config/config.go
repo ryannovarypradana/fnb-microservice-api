@@ -9,16 +9,17 @@ import (
 )
 
 type Config struct {
-	App     AppConfig
-	DB      DBConfig
-	Auth    GRPCConfig
-	User    GRPCConfig
-	Store   GRPCConfig
-	Product GRPCConfig
-	Order   GRPCConfig
-	Company GRPCConfig
-	Redis   RedisConfig
-	Rabbit  RabbitMQConfig
+	App       AppConfig
+	DB        DBConfig
+	Auth      GRPCConfig
+	User      GRPCConfig
+	Store     GRPCConfig
+	Product   GRPCConfig
+	Order     GRPCConfig
+	Company   GRPCConfig
+	Promotion GRPCConfig
+	Redis     RedisConfig
+	Rabbit    RabbitMQConfig
 }
 
 type AppConfig struct {
@@ -114,6 +115,9 @@ func Get() *Config {
 		},
 		Company: GRPCConfig{
 			Port: os.Getenv("COMPANY_SERVICE_PORT"),
+		},
+		Promotion: GRPCConfig{
+			Port: os.Getenv("PROMOTION_SERVICE_PORT"),
 		},
 		Redis: RedisConfig{
 			Host:     os.Getenv("REDIS_HOST"),

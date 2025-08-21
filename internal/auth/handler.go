@@ -4,6 +4,7 @@ import (
 	"context"
 
 	pb "github.com/ryannovarypradana/fnb-microservice-api/pkg/grpc/protoc/auth"
+	"github.com/ryannovarypradana/fnb-microservice-api/pkg/model"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -11,7 +12,7 @@ import (
 
 type AuthGRPCHandler struct {
 	pb.UnimplementedAuthServiceServer
-	service AuthService // This type is now in the same package
+	service AuthService
 }
 
 // NewAuthGRPCHandler is the constructor for the gRPC handler.
@@ -20,12 +21,14 @@ func NewAuthGRPCHandler(grpcServer *grpc.Server, service AuthService) {
 	pb.RegisterAuthServiceServer(grpcServer, handler)
 }
 
-func (h *AuthGRPCHandler) Login(ctx context.Context, req *pb.LoginRequest) (*pb.LoginResponse, error) {
-	token, err := h.service.Login(ctx, req)
-	if err != nil {
-		return nil, status.Errorf(codes.Unauthenticated, "login failed: %v", err)
+// toProtoUser converts a user model to a protobuf user message.
+func toProtoUser(user *model.User) *pb.User {
+	return &pb.User{
+		Id:    user.ID.String(),
+		Name:  user.Name,
+		Email: user.Email,
+		Role:  string(user.Role),
 	}
-	return &pb.LoginResponse{Token: token}, nil
 }
 
 func (h *AuthGRPCHandler) Register(ctx context.Context, req *pb.RegisterRequest) (*pb.RegisterResponse, error) {
@@ -33,13 +36,21 @@ func (h *AuthGRPCHandler) Register(ctx context.Context, req *pb.RegisterRequest)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "registration failed: %v", err)
 	}
+	return &pb.RegisterResponse{User: toProtoUser(createdUser)}, nil
+}
 
-	return &pb.RegisterResponse{
-		User: &pb.User{
-			Id:    createdUser.ID.String(),
-			Name:  createdUser.Name,
-			Email: createdUser.Email,
-			Role:  string(createdUser.Role),
-		},
-	}, nil
+func (h *AuthGRPCHandler) RegisterStaff(ctx context.Context, req *pb.RegisterStaffRequest) (*pb.RegisterResponse, error) {
+	createdUser, err := h.service.RegisterStaff(ctx, req)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "staff registration failed: %v", err)
+	}
+	return &pb.RegisterResponse{User: toProtoUser(createdUser)}, nil
+}
+
+func (h *AuthGRPCHandler) Login(ctx context.Context, req *pb.LoginRequest) (*pb.LoginResponse, error) {
+	token, err := h.service.Login(ctx, req)
+	if err != nil {
+		return nil, status.Errorf(codes.Unauthenticated, "login failed: %v", err)
+	}
+	return &pb.LoginResponse{Token: token}, nil
 }

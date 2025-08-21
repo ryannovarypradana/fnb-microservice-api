@@ -1,0 +1,133 @@
+syntax = "proto3";
+
+package promotion;
+
+option go_package = "./pkg/grpc/protoc/promotion";
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/empty.proto";
+
+// ========== Generic Messages ==========
+message GetByIDRequest {
+    uint64 id = 1;
+}
+
+message DeleteResponse {
+    string message = 1;
+}
+
+// ========== Discount ==========
+message Discount {
+    uint64 id = 1;
+    string name = 2;
+    string type = 3; // e.g., "PERCENTAGE", "FIXED_AMOUNT"
+    double value = 4;
+    google.protobuf.Timestamp start_date = 5;
+    google.protobuf.Timestamp end_date = 6;
+}
+
+message CreateDiscountRequest {
+    string name = 1;
+    string type = 2;
+    double value = 3;
+    google.protobuf.Timestamp start_date = 4;
+    google.protobuf.Timestamp end_date = 5;
+}
+
+message UpdateDiscountRequest {
+    uint64 id = 1;
+    string name = 2;
+    string type = 3;
+    double value = 4;
+    google.protobuf.Timestamp start_date = 5;
+    google.protobuf.Timestamp end_date = 6;
+}
+
+message ListDiscountsResponse {
+    repeated Discount discounts = 1;
+}
+
+
+// ========== Voucher ==========
+message Voucher {
+    uint64 id = 1;
+    string code = 2;
+    string type = 3;
+    double value = 4;
+    int32 quota = 5;
+    google.protobuf.Timestamp start_date = 6;
+    google.protobuf.Timestamp end_date = 7;
+}
+
+message CreateVoucherRequest {
+    string code = 1;
+    string type = 2;
+    double value = 3;
+    int32 quota = 4;
+    google.protobuf.Timestamp start_date = 5;
+    google.protobuf.Timestamp end_date = 6;
+}
+
+message UpdateVoucherRequest {
+    uint64 id = 1;
+    string code = 2;
+    string type = 3;
+    double value = 4;
+    int32 quota = 5;
+    google.protobuf.Timestamp start_date = 6;
+    google.protobuf.Timestamp end_date = 7;
+}
+
+message ListVouchersResponse {
+    repeated Voucher vouchers = 1;
+}
+
+// ========== Bundle ==========
+message Bundle {
+    uint64 id = 1;
+    string name = 2;
+    double price = 3;
+    repeated uint64 product_ids = 4;
+}
+
+message CreateBundleRequest {
+    string name = 1;
+    double price = 2;
+    repeated uint64 product_ids = 3;
+}
+
+message UpdateBundleRequest {
+    uint64 id = 1;
+    string name = 2;
+    double price = 3;
+    repeated uint64 product_ids = 4;
+}
+
+message ListBundlesResponse {
+    repeated Bundle bundles = 1;
+}
+
+
+// ========== Promotion Service ==========
+service PromotionService {
+    // Discount RPCs
+    rpc CreateDiscount(CreateDiscountRequest) returns (Discount);
+    rpc GetDiscount(GetByIDRequest) returns (Discount);
+    rpc UpdateDiscount(UpdateDiscountRequest) returns (Discount);
+    rpc DeleteDiscount(GetByIDRequest) returns (DeleteResponse);
+    rpc ListDiscounts(google.protobuf.Empty) returns (ListDiscountsResponse);
+
+    // Voucher RPCs
+    rpc CreateVoucher(CreateVoucherRequest) returns (Voucher);
+    rpc GetVoucher(GetByIDRequest) returns (Voucher);
+    rpc UpdateVoucher(UpdateVoucherRequest) returns (Voucher);
+    rpc DeleteVoucher(GetByIDRequest) returns (DeleteResponse);
+    rpc ListVouchers(google.protobuf.Empty) returns (ListVouchersResponse);
+
+    // Bundle RPCs
+    rpc CreateBundle(CreateBundleRequest) returns (Bundle);
+    rpc GetBundle(GetByIDRequest) returns (Bundle);
+    rpc UpdateBundle(UpdateBundleRequest) returns (Bundle);
+    rpc DeleteBundle(GetByIDRequest) returns (DeleteResponse);
+    rpc ListBundles(google.protobuf.Empty) returns (ListBundlesResponse);
+}
