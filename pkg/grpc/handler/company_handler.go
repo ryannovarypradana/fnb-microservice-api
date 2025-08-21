@@ -1,12 +1,10 @@
-// pkg/grpc/handler/company_handler.go
-
 package handler
 
 import (
 	"context"
 
 	"github.com/gofiber/fiber/v2"
-	"github.com/ryannovarypradana/fnb-microservice-api/pkg/dto" // <-- IMPORT DITAMBAHKAN
+	"github.com/ryannovarypradana/fnb-microservice-api/pkg/dto"
 	"github.com/ryannovarypradana/fnb-microservice-api/pkg/grpc/protoc/company"
 )
 
@@ -14,6 +12,7 @@ import (
 type CompanyHandler interface {
 	CreateCompany(c *fiber.Ctx) error
 	GetCompany(c *fiber.Ctx) error
+	GetAllCompanies(c *fiber.Ctx) error // <-- DITAMBAHKAN
 }
 
 type companyHandler struct {
@@ -27,7 +26,6 @@ func NewCompanyHandler(client company.CompanyServiceClient) CompanyHandler {
 
 // CreateCompany menangani permintaan HTTP untuk membuat perusahaan baru.
 func (h *companyHandler) CreateCompany(c *fiber.Ctx) error {
-	// Sekarang dto.CreateCompanyRequest sudah bisa ditemukan
 	var req dto.CreateCompanyRequest
 	if err := c.BodyParser(&req); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
@@ -66,6 +64,24 @@ func (h *companyHandler) GetCompany(c *fiber.Ctx) error {
 	res, err := h.client.GetCompany(context.Background(), grpcRequest)
 	if err != nil {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"error": err.Error(),
+		})
+	}
+
+	return c.Status(fiber.StatusOK).JSON(res)
+}
+
+// GetAllCompanies menangani permintaan untuk mendapatkan semua perusahaan.
+func (h *companyHandler) GetAllCompanies(c *fiber.Ctx) error {
+	searchQuery := c.Query("search") // Mengambil query param "search"
+
+	grpcRequest := &company.GetAllCompaniesRequest{
+		Search: searchQuery,
+	}
+
+	res, err := h.client.GetAllCompanies(context.Background(), grpcRequest)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": err.Error(),
 		})
 	}

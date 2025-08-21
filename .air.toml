@@ -1,0 +1,25 @@
+# .air.toml - Konfigurasi yang diperbarui
+
+root = "."
+tmp_dir = "tmp"
+
+[build]
+  # SEKARANG, kita panggil build script kita.
+  # Script ini akan membaca SERVICE_CMD_PATH secara internal.
+  cmd = "bash ./scripts/air-build.sh"
+  
+  # Binary yang akan dijalankan tetap sama.
+  bin = "./tmp/main"
+  
+  # Pantau juga perubahan pada script itu sendiri
+  include_ext = ["go", "tpl", "tmpl", "html", "env", "sh"]
+  
+  exclude_dir = ["assets", "tmp", "vendor", "testdata"]
+  log = "air_errors.log"
+  delay = 1000
+
+[log]
+  time = true
+
+[misc]
+  clean_on_exit = true

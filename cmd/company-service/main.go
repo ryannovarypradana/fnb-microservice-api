@@ -1,4 +1,4 @@
-// /cmd/company-service/main.go
+// cmd/company-service/main.go
 package main
 
 import (
@@ -7,16 +7,10 @@ import (
 	"net"
 	"os"
 
-	// FIX: Give the internal package a clear name, e.g., "internalCompany"
-	"github.com/joho/godotenv"
 	"github.com/ryannovarypradana/fnb-microservice-api/config"
 	internalCompany "github.com/ryannovarypradana/fnb-microservice-api/internal/company"
-
 	"github.com/ryannovarypradana/fnb-microservice-api/pkg/database"
-
-	// FIX: Give the gRPC package a clear alias, e.g., "companyPB" (for Protobuf)
 	companyPB "github.com/ryannovarypradana/fnb-microservice-api/pkg/grpc/protoc/company"
-
 	"github.com/ryannovarypradana/fnb-microservice-api/pkg/model"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
@@ -25,14 +19,18 @@ import (
 func main() {
 	log.Println("Starting Company Service...")
 
-	if os.Getenv("APP_ENV") != "production" {
-		err := godotenv.Load()
-		if err != nil {
-			log.Fatalf("Error loading .env file: %v", err)
-		}
-	}
+	// Memuat konfigurasi terlebih dahulu
 	cfg := config.Get()
-	// Perbaikan di sini: Teruskan cfg ke NewPostgres
+	if cfg == nil {
+		log.Fatalf("FATAL: Config object could not be loaded.")
+	}
+
+	// === BARIS DEBUGGING ===
+	// Baris ini akan mencetak HOST database yang akan digunakan.
+	// Perhatikan baik-baik output dari baris ini saat Anda menjalankan service.
+	log.Printf("DEBUG: Attempting to connect to DB_HOST: '%s'", cfg.DB.Host)
+	// =======================
+
 	db, err := database.NewPostgres(cfg)
 	if err != nil {
 		log.Fatalf("failed to connect to database: %v", err)
@@ -44,14 +42,13 @@ func main() {
 	}
 	log.Println("Database migration completed.")
 
-	// Use the new package names
 	companyRepo := internalCompany.NewRepository(db)
 	companyService := internalCompany.NewService(companyRepo)
 	companyHandler := internalCompany.NewGRPCHandler(companyService)
 
 	port := os.Getenv("COMPANY_SERVICE_PORT")
 	if port == "" {
-		port = "50054"
+		port = "50053" // Fallback port
 	}
 
 	lis, err := net.Listen("tcp", fmt.Sprintf(":%s", port))
@@ -60,7 +57,6 @@ func main() {
 	}
 
 	grpcServer := grpc.NewServer()
-	// FIX: Use the alias for the gRPC package to register the server
 	companyPB.RegisterCompanyServiceServer(grpcServer, companyHandler)
 	reflection.Register(grpcServer)
 

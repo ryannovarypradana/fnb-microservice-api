@@ -7,12 +7,15 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/ryannovarypradana/fnb-microservice-api/pkg/dto"
 	pb "github.com/ryannovarypradana/fnb-microservice-api/pkg/grpc/protoc/order"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 // OrderHandler mendefinisikan interface untuk semua metode handler pesanan.
 type OrderHandler interface {
 	CreateOrder(c *fiber.Ctx) error
 	GetOrder(c *fiber.Ctx) error
+	GetAllOrders(c *fiber.Ctx) error // <-- DITAMBAHKAN
 	CalculateBill(c *fiber.Ctx) error
 	CreatePublicOrder(c *fiber.Ctx) error
 	UpdateOrderStatus(c *fiber.Ctx) error
@@ -72,6 +75,31 @@ func (h *orderHandler) GetOrder(c *fiber.Ctx) error {
 	if err != nil {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": err.Error()})
 	}
+	return c.JSON(res)
+}
+
+// GetAllOrders menangani permintaan untuk mendapatkan semua pesanan.
+func (h *orderHandler) GetAllOrders(c *fiber.Ctx) error {
+	req := &pb.GetAllOrdersRequest{
+		// Di masa depan, Anda bisa menambahkan parameter dari query string di sini
+		// misalnya: c.Query("status"), c.Query("page"), dll.
+	}
+
+	res, err := h.client.GetAllOrders(c.Context(), req)
+	if err != nil {
+		// Secara spesifik menangani kasus "belum diimplementasikan"
+		st, ok := status.FromError(err)
+		if ok && st.Code() == codes.Unimplemented {
+			return c.Status(fiber.StatusNotImplemented).JSON(fiber.Map{
+				"error": "This endpoint is not yet implemented",
+			})
+		}
+		// Menangani error umum lainnya
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": err.Error(),
+		})
+	}
+
 	return c.JSON(res)
 }
 

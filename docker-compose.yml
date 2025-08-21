@@ -6,28 +6,33 @@ services:
     image: postgres:13-alpine
     container_name: postgres_db
     environment:
-      POSTGRES_USER: ${DB_USER:-user}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-password}
-      POSTGRES_DB: ${DB_NAME:-fnb_db}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
     ports:
-      - "5432:5432"
+      - "${DB_PORT}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   rabbitmq:
     image: rabbitmq:3-management-alpine
     container_name: rabbitmq_bus
     ports:
-      - "5672:5672"
-      - "15672:15672"
+      - "${RABBITMQ_PORT}:5672"
+      - "15672:15672" # Management UI
 
   redis:
     image: redis:6-alpine
     container_name: redis_cache
     ports:
-      - "6379:6379"
+      - "${REDIS_PORT}:6379"
 
-  # --- API GATEWAY (PINTU MASUK UTAMA) ---
+  # --- API GATEWAY ---
   api-gateway:
     build:
       context: .
@@ -36,20 +41,25 @@ services:
         SERVICE_NAME: api-gateway
     container_name: api_gateway
     ports:
-      - "8080:8080" # Port utama yang diakses dari luar
+      - "${API_GATEWAY_PORT}:8080"
     environment:
+      - APP_PORT=8080
       - JWT_SECRET=${JWT_SECRET}
-      - AUTH_SERVICE_ADDR=http://auth-service:8081
-      - USER_SERVICE_ADDR=http://user-service:8082
-      - PRODUCT_SERVICE_ADDR=http://product-service:8083
-      - ORDER_SERVICE_ADDR=http://order-service:8084
+      - AUTH_SERVICE_ADDR=${AUTH_SERVICE_ADDR}
+      - USER_SERVICE_ADDR=${USER_SERVICE_ADDR}
+      - COMPANY_SERVICE_ADDR=${COMPANY_SERVICE_ADDR}
+      - STORE_SERVICE_ADDR=${STORE_SERVICE_ADDR}
+      - PRODUCT_SERVICE_ADDR=${PRODUCT_SERVICE_ADDR}
+      - ORDER_SERVICE_ADDR=${ORDER_SERVICE_ADDR}
     depends_on:
       - auth-service
       - user-service
+      - company-service
+      - store-service
       - product-service
       - order-service
 
-  # --- APLIKASI MICROSERVICES ---
+  # --- MICROSERVICES (gRPC) ---
   auth-service:
     build:
       context: .
@@ -57,15 +67,19 @@ services:
       args:
         SERVICE_NAME: auth-service
     ports:
-      - "8081:8081"
+      - "${AUTH_SERVICE_PORT}:${AUTH_SERVICE_PORT}"
     environment:
+      - APP_ENV=${APP_ENV}
+      - AUTH_SERVICE_PORT=${AUTH_SERVICE_PORT}
       - JWT_SECRET=${JWT_SECRET}
-      - DB_HOST=postgres
+      - DB_HOST=${DB_HOST}
+      - DB_PORT=${DB_PORT}
       - DB_USER=${DB_USER}
       - DB_PASSWORD=${DB_PASSWORD}
       - DB_NAME=${DB_NAME}
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
 
   user-service:
     build:
@@ -74,13 +88,61 @@ services:
       args:
         SERVICE_NAME: user-service
     ports:
-      - "8082:8082"
+      - "${USER_SERVICE_PORT}:${USER_SERVICE_PORT}"
     environment:
-      - JWT_SECRET=${JWT_SECRET}
-      - DB_HOST=postgres
-      # ... env vars lain ...
+      - APP_ENV=${APP_ENV}
+      - USER_SERVICE_PORT=${USER_SERVICE_PORT}
+      - DB_HOST=${DB_HOST}
+      - DB_PORT=${DB_PORT}
+      - DB_USER=${DB_USER}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_NAME=${DB_NAME}
+      - COMPANY_SERVICE_ADDR=${COMPANY_SERVICE_ADDR}
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
+      company-service:
+        condition: service_started
+
+  company-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        SERVICE_NAME: company-service
+    ports:
+      - "${COMPANY_SERVICE_PORT}:${COMPANY_SERVICE_PORT}"
+    environment:
+      - APP_ENV=${APP_ENV}
+      - COMPANY_SERVICE_PORT=${COMPANY_SERVICE_PORT}
+      - DB_HOST=${DB_HOST}
+      - DB_PORT=${DB_PORT}
+      - DB_USER=${DB_USER}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_NAME=${DB_NAME}
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  store-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        SERVICE_NAME: store-service
+    ports:
+      - "${STORE_SERVICE_PORT}:${STORE_SERVICE_PORT}"
+    environment:
+      - APP_ENV=${APP_ENV}
+      - STORE_SERVICE_PORT=${STORE_SERVICE_PORT}
+      - DB_HOST=${DB_HOST}
+      - DB_PORT=${DB_PORT}
+      - DB_USER=${DB_USER}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_NAME=${DB_NAME}
+    depends_on:
+      postgres:
+        condition: service_healthy
 
   product-service:
     build:
@@ -89,12 +151,17 @@ services:
       args:
         SERVICE_NAME: product-service
     ports:
-      - "8083:8083"
+      - "${PRODUCT_SERVICE_PORT}:${PRODUCT_SERVICE_PORT}"
     environment:
-      - JWT_SECRET=${JWT_SECRET}
-      - DB_HOST=postgres
-      - REDIS_ADDR=redis:6379
-      # ...
+      - APP_ENV=${APP_ENV}
+      - PRODUCT_SERVICE_PORT=${PRODUCT_SERVICE_PORT}
+      - DB_HOST=${DB_HOST}
+      - DB_PORT=${DB_PORT}
+      - DB_USER=${DB_USER}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_NAME=${DB_NAME}
+      - REDIS_HOST=${REDIS_HOST}
+      - REDIS_PORT=${REDIS_PORT}
     depends_on:
       - postgres
       - redis
@@ -106,17 +173,23 @@ services:
       args:
         SERVICE_NAME: order-service
     ports:
-      - "8084:8084"
+      - "${ORDER_SERVICE_PORT}:${ORDER_SERVICE_PORT}"
     environment:
-      - JWT_SECRET=${JWT_SECRET}
-      - DB_HOST=postgres
-      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
-      - PRODUCT_SERVICE_URL=http://product-service:8083
-      # ...
+      - APP_ENV=${APP_ENV}
+      - ORDER_SERVICE_PORT=${ORDER_SERVICE_PORT}
+      - DB_HOST=${DB_HOST}
+      - DB_PORT=${DB_PORT}
+      - DB_USER=${DB_USER}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_NAME=${DB_NAME}
+      - RABBITMQ_URL=${RABBITMQ_URL}
+      - PRODUCT_SERVICE_ADDR=${PRODUCT_SERVICE_ADDR}
+      - STORE_SERVICE_ADDR=${STORE_SERVICE_ADDR}
     depends_on:
       - postgres
       - rabbitmq
       - product-service
+      - store-service
 
   notification-service:
     build:
@@ -125,7 +198,7 @@ services:
       args:
         SERVICE_NAME: notification-service
     environment:
-      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
+      - RABBITMQ_URL=${RABBITMQ_URL}
     depends_on:
       - rabbitmq
 

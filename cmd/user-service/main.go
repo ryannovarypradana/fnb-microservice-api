@@ -1,9 +1,11 @@
+// cmd/user-service/main.go
 package main
 
 import (
 	"fmt"
 	"log"
 	"net"
+	"os" // <-- TAMBAHKAN IMPORT
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -31,8 +33,14 @@ func main() {
 		log.Fatalf("FATAL: failed to listen on port %s: %v", cfg.User.Port, err)
 	}
 
+	// --- PERUBAHAN DI SINI ---
+	companyServiceAddr := os.Getenv("COMPANY_SERVICE_ADDR")
+	if companyServiceAddr == "" {
+		log.Fatalf("FATAL: COMPANY_SERVICE_ADDR environment variable not set")
+	}
+
 	companyConn, err := grpc.Dial(
-		fmt.Sprintf("localhost:%s", cfg.Company.Port),
+		companyServiceAddr, // <-- Gunakan variabel lingkungan
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 	)
 	if err != nil {
@@ -41,12 +49,12 @@ func main() {
 	defer companyConn.Close()
 	companyClient := companyPB.NewCompanyServiceClient(companyConn)
 	log.Println("Successfully connected to Company service.")
+	// --- AKHIR PERUBAHAN ---
 
 	grpcServer := grpc.NewServer()
 
 	userRepo := user.NewUserRepository(db)
 	userService := user.NewUserService(userRepo, companyClient)
-	// This line should now work correctly as NewUserGRPCHandler is defined in the 'user' package
 	user.NewUserGRPCHandler(grpcServer, userService)
 
 	log.Printf("User service is listening at %v", lis.Addr())

@@ -1,3 +1,4 @@
+// config/config.go
 package config
 
 import (
@@ -51,11 +52,35 @@ type RabbitMQConfig struct {
 	Password string
 }
 
+// Get memuat konfigurasi berdasarkan lingkungan aplikasi.
+// Urutan prioritas pemuatan file: .env.local -> .env.staging -> .env
+// Untuk 'production', disarankan untuk tidak menggunakan file .env sama sekali.
 func Get() *Config {
-	if os.Getenv("APP_ENV") != "production" {
-		err := godotenv.Load()
+	env := os.Getenv("APP_ENV")
+	if env == "" {
+		env = "development" // Default ke development jika tidak diset
+	}
+
+	// Untuk production, kita tidak memuat file .env sama sekali.
+	// Konfigurasi harus disediakan melalui environment variables di server.
+	if env != "production" {
+		filenames := []string{}
+		if env == "development" {
+			// Untuk development, utamakan .env.local
+			filenames = append(filenames, ".env.local")
+		}
+		if env == "staging" {
+			// Untuk staging, gunakan .env.staging
+			filenames = append(filenames, ".env.staging")
+		}
+		// Selalu tambahkan .env sebagai fallback
+		filenames = append(filenames, ".env")
+
+		// Muat file .env berdasarkan urutan prioritas
+		// godotenv akan memuat yang pertama kali ditemukannya.
+		err := godotenv.Load(filenames...)
 		if err != nil {
-			log.Fatalf("Error loading .env file: %v", err)
+			log.Printf("Warning: Could not load any of the following .env files: %v. Relying on system environment variables.", filenames)
 		}
 	}
 
@@ -87,7 +112,7 @@ func Get() *Config {
 		Order: GRPCConfig{
 			Port: os.Getenv("ORDER_SERVICE_PORT"),
 		},
-		Company: GRPCConfig{ // <-- ADD THIS BLOCK
+		Company: GRPCConfig{
 			Port: os.Getenv("COMPANY_SERVICE_PORT"),
 		},
 		Redis: RedisConfig{
