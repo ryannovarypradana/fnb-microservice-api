@@ -11,29 +11,35 @@ import (
 
 // JwtService adalah interface untuk operasi JWT.
 type JwtService interface {
-	GenerateToken(userID uuid.UUID, role string) (string, error)
+	// Tambahkan parameter companyID
+	GenerateToken(userID uuid.UUID, companyID string, role string) (string, error)
 	VerifyToken(tokenString string) (*model.Claims, error)
 }
 
 // jwtService adalah implementasi dari JwtService.
 type jwtService struct {
 	secret string
+	// Tambahkan TTL untuk durasi token
+	ttl time.Duration
 }
 
 // NewJwtService adalah konstruktor untuk jwtService.
 func NewJwtService(cfg *config.Config) JwtService {
 	return &jwtService{
 		secret: cfg.App.JWTSecret,
+		// Atur TTL dari config, default 24 jam jika tidak ada
+		ttl: 24 * time.Hour,
 	}
 }
 
-// GenerateToken sekarang adalah sebuah method.
-func (s *jwtService) GenerateToken(userID uuid.UUID, role string) (string, error) {
+// GenerateToken sekarang menerima companyID.
+func (s *jwtService) GenerateToken(userID uuid.UUID, companyID string, role string) (string, error) {
 	claims := model.Claims{
-		UserID: userID.String(), // Menggunakan String() dari UUID
-		Role:   role,
+		UserID:    userID.String(),
+		CompanyID: companyID, // Tambahkan companyID ke dalam claims
+		Role:      role,
 		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Hour * 24)),
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(s.ttl)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
 		},
 	}

@@ -9,7 +9,6 @@ import (
 )
 
 func AuthMiddleware(cfg *config.Config) fiber.Handler {
-	// 1. Buat instance JwtService di sini.
 	jwtService := utils.NewJwtService(cfg)
 
 	return func(c *fiber.Ctx) error {
@@ -25,8 +24,6 @@ func AuthMiddleware(cfg *config.Config) fiber.Handler {
 
 		tokenString := parts[1]
 
-		// 2. Panggil method VerifyToken() dari instance jwtService.
-		//    Perhatikan bahwa kita tidak perlu lagi memberikan secret, karena sudah disimpan di dalam jwtService.
 		claims, err := jwtService.VerifyToken(tokenString)
 		if err != nil {
 			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Invalid token"})
@@ -34,6 +31,7 @@ func AuthMiddleware(cfg *config.Config) fiber.Handler {
 
 		c.Locals("userID", claims.UserID)
 		c.Locals("role", claims.Role)
+		c.Locals("company_id", claims.CompanyID) //  Add this line
 
 		return c.Next()
 	}

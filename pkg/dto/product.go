@@ -5,9 +5,9 @@ type CreateMenuRequest struct {
 	Name        string  `json:"name" binding:"required"`
 	Description string  `json:"description"`
 	Price       float64 `json:"price" binding:"required,gt=0"`
-	ImageURL    string  `json:"image_url" binding:"omitempty,url"`
-	CategoryID  string  `json:"category_id" binding:"required"`
-	StoreID     string  `json:"store_id" binding:"required"`
+	ImageURL    string  `json:"imageUrl" binding:"omitempty,url"`
+	CategoryID  string  `json:"categoryId" binding:"required"`
+	StoreID     string  `json:"storeId" binding:"required"`
 }
 
 // UpdateMenuRequest defines the structure for updating an existing menu.
@@ -15,14 +15,14 @@ type UpdateMenuRequest struct {
 	Name        string  `json:"name" binding:"required"`
 	Description string  `json:"description"`
 	Price       float64 `json:"price" binding:"required,gt=0"`
-	ImageURL    string  `json:"image_url" binding:"omitempty,url"`
-	CategoryID  string  `json:"category_id" binding:"required"`
+	ImageURL    string  `json:"imageUrl" binding:"omitempty,url"`
+	CategoryID  string  `json:"categoryId" binding:"required"`
 }
 
 // CreateCategoryRequest defines the structure for creating a new category.
 type CreateCategoryRequest struct {
 	Name    string `json:"name" binding:"required"`
-	StoreID string `json:"store_id" binding:"required"`
+	StoreID string `json:"storeId" binding:"required"`
 }
 
 // UpdateCategoryRequest defines the structure for updating an existing category.
@@ -36,10 +36,10 @@ type MenuResponse struct {
 	Name         string  `json:"name"`
 	Description  string  `json:"description"`
 	Price        float64 `json:"price"`
-	ImageURL     string  `json:"image_url"`
-	CategoryID   string  `json:"category_id"`
+	ImageURL     string  `json:"imageUrl"`
+	CategoryID   string  `json:"categoryId"`
 	CategoryName string  `json:"category_name"`
-	StoreID      string  `json:"store_id"`
+	StoreID      string  `json:"storeId"`
 	CreatedAt    string  `json:"created_at"`
 	UpdatedAt    string  `json:"updated_at"`
 }
@@ -48,7 +48,7 @@ type MenuResponse struct {
 type CategoryResponse struct {
 	ID        string `json:"id"`
 	Name      string `json:"name"`
-	StoreID   string `json:"store_id"`
+	StoreID   string `json:"storeId"`
 	CreatedAt string `json:"created_at"`
 	UpdatedAt string `json:"updated_at"`
 }

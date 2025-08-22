@@ -12,12 +12,24 @@ func SetupRoutes(app *fiber.App, cfg *config.Config, handlers *handler.Handlers)
 	api := app.Group("/api")
 
 	// Rute Publik
-	auth := api.Group("/auth")
+	auth := api.Group("/v1/auth")
 	{
 		auth.Post("/register", handlers.Auth.Register)
 		auth.Post("/login", handlers.Auth.Login)
 	}
-	api.Post("/public/orders", handlers.Order.CreatePublicOrder)
+	publicApi := api.Group("/public")
+	{
+		// Endpoint untuk Store
+		publicApi.Get("/stores", handlers.Store.GetAllStores)
+		publicApi.Get("/stores/:id", handlers.Store.GetStore)
+
+		// Endpoint untuk Menu & Kategori berdasarkan Store
+		publicApi.Get("/stores/by-code/:storeCode/menus", handlers.Product.GetMenusByStoreCode)
+		publicApi.Get("/stores/by-code/:storeCode/categories", handlers.Product.GetCategoriesByStoreCode)
+
+		// Endpoint untuk membuat pesanan publik
+		publicApi.Post("/orders", handlers.Order.CreatePublicOrder)
+	}
 
 	// --- Rute Terproteksi ---
 	authRequired := api.Group("/v1", middleware.AuthMiddleware(cfg))

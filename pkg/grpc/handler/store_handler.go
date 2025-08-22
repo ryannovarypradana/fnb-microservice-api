@@ -19,6 +19,14 @@ func (h *StoreHandler) CreateStore(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
 	}
 
+	companyID, ok := c.Locals("company_id").(string)
+	if !ok || companyID == "" {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "invalid company id"})
+	}
+
+	// Change CompanyID to CompanyId to match the generated protobuf struct
+	req.CompanyId = companyID
+
 	res, err := h.client.CreateStore(c.Context(), &req)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})

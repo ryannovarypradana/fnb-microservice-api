@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/google/uuid" // <-- Pastikan import ini ada
 	"github.com/ryannovarypradana/fnb-microservice-api/pkg/dto"
 	"github.com/ryannovarypradana/fnb-microservice-api/pkg/grpc/protoc/product"
 	"github.com/ryannovarypradana/fnb-microservice-api/pkg/grpc/protoc/store"
@@ -33,11 +34,10 @@ type ProductHandler interface {
 
 type productHandler struct {
 	productClient product.ProductServiceClient
-	storeClient   store.StoreServiceClient // <-- DEPENDENCY BARU
+	storeClient   store.StoreServiceClient
 }
 
 // NewProductHandler membuat instance baru dari productHandler.
-// Perhatikan penambahan storeClient sebagai parameter.
 func NewProductHandler(productClient product.ProductServiceClient, storeClient store.StoreServiceClient) ProductHandler {
 	return &productHandler{
 		productClient: productClient,
@@ -56,13 +56,27 @@ func (h *productHandler) CreateMenu(c *fiber.Ctx) error {
 		})
 	}
 
+	// Validasi bahwa StoreID ada di body dan merupakan UUID yang valid.
+	if _, err := uuid.Parse(req.StoreID); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Invalid or missing storeId in request body",
+		})
+	}
+
+	// Validasi CategoryID jika diperlukan
+	if _, err := uuid.Parse(req.CategoryID); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Invalid or missing categoryId in request body",
+		})
+	}
+
 	grpcRequest := &product.CreateMenuRequest{
 		Name:        req.Name,
 		Description: req.Description,
 		Price:       req.Price,
 		ImageUrl:    req.ImageURL,
-		CategoryId:  req.CategoryID, // Diperbaiki: Menggunakan string
-		StoreId:     req.StoreID,    // Diperbaiki: Menggunakan string
+		CategoryId:  req.CategoryID,
+		StoreId:     req.StoreID,
 	}
 
 	res, err := h.productClient.CreateMenu(c.Context(), grpcRequest)
@@ -108,7 +122,7 @@ func (h *productHandler) UpdateMenu(c *fiber.Ctx) error {
 		Description: req.Description,
 		Price:       req.Price,
 		ImageUrl:    req.ImageURL,
-		CategoryId:  req.CategoryID, // Diperbaiki: Menggunakan string
+		CategoryId:  req.CategoryID,
 	}
 
 	res, err := h.productClient.UpdateMenu(c.Context(), grpcRequest)
@@ -142,9 +156,16 @@ func (h *productHandler) CreateCategory(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Cannot parse request body"})
 	}
 
+	// Validasi bahwa StoreID ada di body dan merupakan UUID yang valid.
+	if _, err := uuid.Parse(req.StoreID); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Invalid or missing storeId in request body",
+		})
+	}
+
 	grpcRequest := &product.CreateCategoryRequest{
 		Name:    req.Name,
-		StoreId: req.StoreID, // Diperbaiki: Menggunakan string
+		StoreId: req.StoreID,
 	}
 
 	res, err := h.productClient.CreateCategory(c.Context(), grpcRequest)
@@ -182,7 +203,7 @@ func (h *productHandler) UpdateCategory(c *fiber.Ctx) error {
 		Name:       req.Name,
 	}
 
-	res, err := h.productClient.UpdateCategory(c.Context(), grpcRequest) // Diperbaiki: Menggunakan h.productClient
+	res, err := h.productClient.UpdateCategory(c.Context(), grpcRequest)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 	}

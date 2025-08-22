@@ -6,16 +6,13 @@ import (
 	"log"
 
 	"github.com/google/uuid"
-	"golang.org/x/crypto/bcrypt"
-
 	pb "github.com/ryannovarypradana/fnb-microservice-api/pkg/grpc/protoc/auth"
 	"github.com/ryannovarypradana/fnb-microservice-api/pkg/model"
-
-	// FIXED: Typo 'github.comcom' corrected to 'github.com'
 	"github.com/ryannovarypradana/fnb-microservice-api/pkg/utils"
+	"golang.org/x/crypto/bcrypt"
 )
 
-// AuthService is the interface for authentication business logic.
+// ... (interface dan struct tidak berubah)
 type AuthService interface {
 	Register(ctx context.Context, req *pb.RegisterRequest) (*model.User, error)
 	RegisterStaff(ctx context.Context, req *pb.RegisterStaffRequest) (*model.User, error)
@@ -27,12 +24,11 @@ type authService struct {
 	jwtService utils.JwtService
 }
 
-// NewAuthService is the constructor for authService.
+// ... (NewAuthService, Register, RegisterStaff tidak berubah)
 func NewAuthService(repo AuthRepository, jwtService utils.JwtService) AuthService {
 	return &authService{repo, jwtService}
 }
 
-// Register is for customer registration.
 func (s *authService) Register(ctx context.Context, req *pb.RegisterRequest) (*model.User, error) {
 	staffReq := &pb.RegisterStaffRequest{
 		Name:     req.Name,
@@ -43,7 +39,6 @@ func (s *authService) Register(ctx context.Context, req *pb.RegisterRequest) (*m
 	return s.RegisterStaff(ctx, staffReq)
 }
 
-// RegisterStaff is for internal staff registration.
 func (s *authService) RegisterStaff(ctx context.Context, req *pb.RegisterStaffRequest) (*model.User, error) {
 	_, err := s.repo.FindByEmail(ctx, req.Email)
 	if err == nil {
@@ -97,7 +92,14 @@ func (s *authService) Login(ctx context.Context, req *pb.LoginRequest) (string, 
 		return "", errors.New("invalid credentials")
 	}
 
-	token, err := s.jwtService.GenerateToken(user.ID, string(user.Role))
+	// Siapkan companyID sebagai string, tangani jika nil
+	var companyIDStr string
+	if user.CompanyID != nil {
+		companyIDStr = user.CompanyID.String()
+	}
+
+	// Panggil GenerateToken dengan companyID
+	token, err := s.jwtService.GenerateToken(user.ID, companyIDStr, string(user.Role))
 	if err != nil {
 		return "", errors.New("failed to generate token")
 	}
