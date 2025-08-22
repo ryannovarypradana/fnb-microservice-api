@@ -27,11 +27,10 @@ func SetupRoutes(app *fiber.App, cfg *config.Config, handlers *handler.Handlers)
 	{
 		users.Get("/:id", handlers.User.GetUser)
 		users.Put("/:id", handlers.User.UpdateUser)
-		// User dihapus oleh peran administratif
 		users.Delete("/:id", middleware.Authorize(model.RoleSuperAdmin, model.RoleCompanyRep, model.RoleAdmin), handlers.User.DeleteUser)
 	}
 
-	// Rute Super Admin (Hanya SUPER_ADMIN)
+	// Rute Super Admin
 	superAdmin := authRequired.Group("/super-admin", middleware.Authorize(model.RoleSuperAdmin))
 	{
 		superAdmin.Post("/companies", handlers.User.CreateCompanyWithRep)
@@ -40,13 +39,12 @@ func SetupRoutes(app *fiber.App, cfg *config.Config, handlers *handler.Handlers)
 	// Rute Company
 	companies := authRequired.Group("/companies")
 	{
-		// Hanya SUPER_ADMIN yang bisa membuat company
 		companies.Post("/", middleware.Authorize(model.RoleSuperAdmin), handlers.Company.CreateCompany)
 		companies.Get("/", handlers.Company.GetAllCompanies)
 		companies.Get("/:id", handlers.Company.GetCompany)
 	}
 
-	// Rute Store (Dikelola oleh COMPANY_REP dan ADMIN)
+	// Rute Store
 	stores := authRequired.Group("/stores")
 	{
 		stores.Post("/", middleware.Authorize(model.RoleCompanyRep, model.RoleAdmin), handlers.Store.CreateStore)
@@ -57,22 +55,64 @@ func SetupRoutes(app *fiber.App, cfg *config.Config, handlers *handler.Handlers)
 		stores.Post("/clone", middleware.Authorize(model.RoleCompanyRep, model.RoleAdmin), handlers.Store.CloneStoreContent)
 	}
 
-	// Rute Menu (Dikelola oleh COMPANY_REP, STORE_ADMIN, dan ADMIN)
-	menus := authRequired.Group("/menus")
+	// Rute Menu & Kategori
+	menus := authRequired.Group("/menus", middleware.Authorize(model.RoleCompanyRep, model.RoleStoreAdmin, model.RoleAdmin))
 	{
-		menus.Post("/", middleware.Authorize(model.RoleCompanyRep, model.RoleStoreAdmin, model.RoleAdmin), handlers.Product.CreateMenu)
+		menus.Post("/", handlers.Product.CreateMenu)
 		menus.Get("/:id", handlers.Product.GetMenuByID)
+		menus.Put("/:id", handlers.Product.UpdateMenu)
+		menus.Delete("/:id", handlers.Product.DeleteMenu)
+	}
+
+	categories := authRequired.Group("/categories", middleware.Authorize(model.RoleCompanyRep, model.RoleStoreAdmin, model.RoleAdmin))
+	{
+		categories.Post("/", handlers.Product.CreateCategory)
+		categories.Get("/:id", handlers.Product.GetCategoryByID)
+		categories.Put("/:id", handlers.Product.UpdateCategory)
+		categories.Delete("/:id", handlers.Product.DeleteCategory)
+	}
+
+	// Rute Promosi (CRUD Lengkap)
+	promotions := authRequired.Group("/promotions", middleware.Authorize(model.RoleCompanyRep, model.RoleStoreAdmin, model.RoleAdmin))
+	{
+		// Discount Routes
+		discounts := promotions.Group("/discounts")
+		{
+			discounts.Post("/", handlers.Promotion.CreateDiscount)
+			discounts.Get("/", handlers.Promotion.ListDiscounts)
+			discounts.Get("/:id", handlers.Promotion.GetDiscount)
+			discounts.Put("/:id", handlers.Promotion.UpdateDiscount)
+			discounts.Delete("/:id", handlers.Promotion.DeleteDiscount)
+		}
+
+		// Voucher Routes
+		vouchers := promotions.Group("/vouchers")
+		{
+			vouchers.Post("/", handlers.Promotion.CreateVoucher)
+			vouchers.Get("/", handlers.Promotion.ListVouchers)
+			vouchers.Get("/:id", handlers.Promotion.GetVoucher)
+			vouchers.Put("/:id", handlers.Promotion.UpdateVoucher)
+			vouchers.Delete("/:id", handlers.Promotion.DeleteVoucher)
+		}
+
+		// Bundle Routes
+		bundles := promotions.Group("/bundles")
+		{
+			bundles.Post("/", handlers.Promotion.CreateBundle)
+			bundles.Get("/", handlers.Promotion.ListBundles)
+			bundles.Get("/:id", handlers.Promotion.GetBundle)
+			bundles.Put("/:id", handlers.Promotion.UpdateBundle)
+			bundles.Delete("/:id", handlers.Promotion.DeleteBundle)
+		}
 	}
 
 	// Rute Order
 	orders := authRequired.Group("/orders")
 	{
-		// Semua pengguna yang login dapat membuat pesanan
 		orders.Post("/", handlers.Order.CreateOrder)
 		orders.Get("/", handlers.Order.GetAllOrders)
 		orders.Get("/:id", handlers.Order.GetOrder)
 		orders.Post("/calculate-bill", handlers.Order.CalculateBill)
-		// Operasional order oleh STORE_ADMIN, CASHIER, dan ADMIN
 		orders.Patch("/:id/status", middleware.Authorize(model.RoleStoreAdmin, model.RoleCashier, model.RoleAdmin), handlers.Order.UpdateOrderStatus)
 		orders.Put("/:id/items", middleware.Authorize(model.RoleStoreAdmin, model.RoleCashier, model.RoleAdmin), handlers.Order.UpdateOrderItems)
 		orders.Post("/:id/confirm-payment", middleware.Authorize(model.RoleStoreAdmin, model.RoleCashier, model.RoleAdmin), handlers.Order.ConfirmPayment)

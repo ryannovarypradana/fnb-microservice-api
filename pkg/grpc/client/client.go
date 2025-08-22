@@ -11,6 +11,7 @@ import (
 	"github.com/ryannovarypradana/fnb-microservice-api/pkg/grpc/protoc/company"
 	"github.com/ryannovarypradana/fnb-microservice-api/pkg/grpc/protoc/order"
 	"github.com/ryannovarypradana/fnb-microservice-api/pkg/grpc/protoc/product"
+	"github.com/ryannovarypradana/fnb-microservice-api/pkg/grpc/protoc/promotion"
 	"github.com/ryannovarypradana/fnb-microservice-api/pkg/grpc/protoc/store"
 	"github.com/ryannovarypradana/fnb-microservice-api/pkg/grpc/protoc/user"
 	"google.golang.org/grpc"
@@ -78,4 +79,12 @@ func NewOrderClient(cfg *config.Config) (order.OrderServiceClient, error) {
 		return nil, err
 	}
 	return order.NewOrderServiceClient(conn), nil
+}
+
+func NewPromotionClient(cfg *config.Config) (promotion.PromotionServiceClient, error) {
+	conn, err := dialService("PROMOTION_SERVICE_ADDR")
+	if err != nil {
+		return nil, err
+	}
+	return promotion.NewPromotionServiceClient(conn), nil
 }

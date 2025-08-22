@@ -47,6 +47,10 @@ func main() {
 	if err != nil {
 		log.Fatalf("Could not connect to company service: %v", err)
 	}
+	promotionSvc, err := client.NewPromotionClient(cfg)
+	if err != nil {
+		log.Fatalf("Could not connect to promotion service: %v", err)
+	}
 
 	app := fiber.New()
 	app.Use(logger.New())
@@ -54,12 +58,13 @@ func main() {
 
 	// Kumpulkan semua handler
 	handlers := &handler.Handlers{
-		Auth:    handler.NewAuthHandler(authSvc),
-		User:    handler.NewUserHandler(userSvc),
-		Store:   handler.NewStoreHandler(storeSvc),
-		Product: handler.NewProductHandler(productSvc),
-		Order:   handler.NewOrderHandler(orderSvc),
-		Company: handler.NewCompanyHandler(companySvc), // <-- Tambahkan Company Handler
+		Auth:      handler.NewAuthHandler(authSvc),
+		User:      handler.NewUserHandler(userSvc),
+		Store:     handler.NewStoreHandler(storeSvc),
+		Product:   handler.NewProductHandler(productSvc),
+		Order:     handler.NewOrderHandler(orderSvc),
+		Company:   handler.NewCompanyHandler(companySvc), // <-- Tambahkan Company Handler
+		Promotion: handler.NewPromotionHandler(promotionSvc),
 	}
 
 	// 2. SETUP ROUTE
