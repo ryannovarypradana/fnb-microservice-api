@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"math/rand"
-	"strconv"
 	"time"
 
 	"github.com/google/uuid"
@@ -52,25 +51,20 @@ func (s *orderService) CreateOrder(ctx context.Context, req *pb.CreateOrderReque
 	var totalAmount float64
 
 	for _, item := range req.Items {
-		// Asumsi product.proto menggunakan int64 untuk MenuId
-		menuIDInt, err := strconv.ParseInt(item.ProductId, 10, 64)
-		if err != nil {
-			return nil, fmt.Errorf("invalid product id format: %s", item.ProductId)
-		}
-
-		product, err := s.productClient.GetMenuByID(ctx, &productPB.GetMenuByIDRequest{MenuId: menuIDInt})
+		// Mengambil produk dari product-service
+		product, err := s.productClient.GetMenuByID(ctx, &productPB.GetMenuByIDRequest{MenuId: item.ProductId})
 		if err != nil {
 			return nil, fmt.Errorf("product %s not found", item.ProductId)
 		}
 
-		// Asumsi model.OrderItem menggunakan uuid.UUID untuk ProductID
-		menuIDUUID, err := uuid.Parse(strconv.FormatInt(product.Menu.Id, 10))
+		// Mengubah ID produk dari string menjadi UUID
+		productIDUUID, err := uuid.Parse(product.Menu.Id)
 		if err != nil {
 			return nil, fmt.Errorf("cannot parse product id from response: %v", err)
 		}
 
 		orderItems = append(orderItems, &model.OrderItem{
-			ProductID: menuIDUUID,
+			ProductID: productIDUUID,
 			Quantity:  int(item.Quantity),
 			Price:     product.Menu.Price,
 		})
@@ -100,12 +94,8 @@ func (s *orderService) GetOrder(ctx context.Context, req *pb.GetOrderRequest) (*
 func (s *orderService) CalculateBill(ctx context.Context, req *pb.CalculateBillRequest) (*pb.BillResponse, error) {
 	var subtotal float64
 	for _, item := range req.Items {
-		menuIDInt, err := strconv.ParseInt(item.ProductId, 10, 64)
-		if err != nil {
-			return nil, fmt.Errorf("invalid product id format: %s", item.ProductId)
-		}
-
-		product, err := s.productClient.GetMenuByID(ctx, &productPB.GetMenuByIDRequest{MenuId: menuIDInt})
+		// Mengambil produk dari product-service
+		product, err := s.productClient.GetMenuByID(ctx, &productPB.GetMenuByIDRequest{MenuId: item.ProductId})
 		if err != nil {
 			return nil, fmt.Errorf("product with id %s not found", item.ProductId)
 		}
@@ -123,29 +113,27 @@ func (s *orderService) CalculateBill(ctx context.Context, req *pb.CalculateBillR
 }
 
 func (s *orderService) CreatePublicOrder(ctx context.Context, req *pb.CreatePublicOrderRequest) (*model.Order, error) {
-	// Anda perlu GetStoreByCode di store.proto & service, asumsikan itu ada
-	// store, err := s.storeClient.GetStoreByCode(ctx, &storePB.GetStoreByCodeRequest{Code: req.StoreCode})
-	// if err != nil {
-	// 	return nil, errors.New("store not found")
-	// }
-	// storeID, _ := uuid.Parse(store.Store.Id)
-
-	storeID := uuid.New() // Placeholder jika GetStoreByCode belum ada
+	// Diperbaiki: Menggunakan StoreCode sesuai dengan file proto
+	storeRes, err := s.storeClient.GetStoreByCode(ctx, &storePB.GetStoreByCodeRequest{StoreCode: req.StoreCode})
+	if err != nil {
+		return nil, errors.New("store not found")
+	}
+	storeID, _ := uuid.Parse(storeRes.Store.Id)
 
 	var orderItems []*model.OrderItem
 	var totalAmount float64
 
 	for _, item := range req.Items {
-		menuIDInt, err := strconv.ParseInt(item.ProductId, 10, 64)
-		if err != nil {
-			return nil, fmt.Errorf("invalid product id format: %s", item.ProductId)
-		}
-		product, err := s.productClient.GetMenuByID(ctx, &productPB.GetMenuByIDRequest{MenuId: menuIDInt})
+		product, err := s.productClient.GetMenuByID(ctx, &productPB.GetMenuByIDRequest{MenuId: item.ProductId})
 		if err != nil {
 			return nil, fmt.Errorf("product %s not found", item.ProductId)
 		}
 
-		menuIDUUID, _ := uuid.Parse(strconv.FormatInt(product.Menu.Id, 10))
+		menuIDUUID, err := uuid.Parse(product.Menu.Id)
+		if err != nil {
+			return nil, fmt.Errorf("cannot parse product id from response: %v", err)
+		}
+
 		orderItems = append(orderItems, &model.OrderItem{
 			ProductID: menuIDUUID,
 			Quantity:  int(item.Quantity),
@@ -203,15 +191,14 @@ func (s *orderService) UpdateOrderItems(ctx context.Context, req *pb.UpdateOrder
 		var newItems []*model.OrderItem
 		var newTotal float64
 		for _, item := range req.Items {
-			menuIDInt, err := strconv.ParseInt(item.ProductId, 10, 64)
-			if err != nil {
-				return fmt.Errorf("invalid product id format: %s", item.ProductId)
-			}
-			product, err := s.productClient.GetMenuByID(ctx, &productPB.GetMenuByIDRequest{MenuId: menuIDInt})
+			product, err := s.productClient.GetMenuByID(ctx, &productPB.GetMenuByIDRequest{MenuId: item.ProductId})
 			if err != nil {
 				return fmt.Errorf("product %s not found", item.ProductId)
 			}
-			menuIDUUID, _ := uuid.Parse(strconv.FormatInt(product.Menu.Id, 10))
+			menuIDUUID, err := uuid.Parse(product.Menu.Id)
+			if err != nil {
+				return fmt.Errorf("cannot parse product id from response: %v", err)
+			}
 			newItem := &model.OrderItem{
 				OrderID:   order.ID,
 				ProductID: menuIDUUID,

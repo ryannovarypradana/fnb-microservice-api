@@ -1,8 +1,6 @@
 package handler
 
 import (
-	"strconv"
-
 	"github.com/gofiber/fiber/v2"
 	pb "github.com/ryannovarypradana/fnb-microservice-api/pkg/grpc/protoc/promotion"
 	"google.golang.org/protobuf/types/known/emptypb"
@@ -56,7 +54,8 @@ func (h *promotionHandler) CreateDiscount(c *fiber.Ctx) error {
 }
 
 func (h *promotionHandler) GetDiscount(c *fiber.Ctx) error {
-	id, _ := strconv.ParseUint(c.Params("id"), 10, 64)
+	// Diperbaiki: Menggunakan ID sebagai string, bukan uint64
+	id := c.Params("id")
 	res, err := h.client.GetDiscount(c.Context(), &pb.GetByIDRequest{Id: id})
 	if err != nil {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": err.Error()})
@@ -73,7 +72,8 @@ func (h *promotionHandler) ListDiscounts(c *fiber.Ctx) error {
 }
 
 func (h *promotionHandler) UpdateDiscount(c *fiber.Ctx) error {
-	id, _ := strconv.ParseUint(c.Params("id"), 10, 64)
+	// Diperbaiki: Menggunakan ID sebagai string, bukan uint64
+	id := c.Params("id")
 	var req pb.UpdateDiscountRequest
 	if err := c.BodyParser(&req); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
@@ -87,7 +87,8 @@ func (h *promotionHandler) UpdateDiscount(c *fiber.Ctx) error {
 }
 
 func (h *promotionHandler) DeleteDiscount(c *fiber.Ctx) error {
-	id, _ := strconv.ParseUint(c.Params("id"), 10, 64)
+	// Diperbaiki: Menggunakan ID sebagai string, bukan uint64
+	id := c.Params("id")
 	res, err := h.client.DeleteDiscount(c.Context(), &pb.GetByIDRequest{Id: id})
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
@@ -110,7 +111,8 @@ func (h *promotionHandler) CreateVoucher(c *fiber.Ctx) error {
 }
 
 func (h *promotionHandler) GetVoucher(c *fiber.Ctx) error {
-	id, _ := strconv.ParseUint(c.Params("id"), 10, 64)
+	// Diperbaiki: Menggunakan ID sebagai string, bukan uint64
+	id := c.Params("id")
 	res, err := h.client.GetVoucher(c.Context(), &pb.GetByIDRequest{Id: id})
 	if err != nil {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": err.Error()})
@@ -127,7 +129,8 @@ func (h *promotionHandler) ListVouchers(c *fiber.Ctx) error {
 }
 
 func (h *promotionHandler) UpdateVoucher(c *fiber.Ctx) error {
-	id, _ := strconv.ParseUint(c.Params("id"), 10, 64)
+	// Diperbaiki: Menggunakan ID sebagai string, bukan uint64
+	id := c.Params("id")
 	var req pb.UpdateVoucherRequest
 	if err := c.BodyParser(&req); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
@@ -141,7 +144,8 @@ func (h *promotionHandler) UpdateVoucher(c *fiber.Ctx) error {
 }
 
 func (h *promotionHandler) DeleteVoucher(c *fiber.Ctx) error {
-	id, _ := strconv.ParseUint(c.Params("id"), 10, 64)
+	// Diperbaiki: Menggunakan ID sebagai string, bukan uint64
+	id := c.Params("id")
 	res, err := h.client.DeleteVoucher(c.Context(), &pb.GetByIDRequest{Id: id})
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
@@ -164,7 +168,8 @@ func (h *promotionHandler) CreateBundle(c *fiber.Ctx) error {
 }
 
 func (h *promotionHandler) GetBundle(c *fiber.Ctx) error {
-	id, _ := strconv.ParseUint(c.Params("id"), 10, 64)
+	// Diperbaiki: Menggunakan ID sebagai string, bukan uint64
+	id := c.Params("id")
 	res, err := h.client.GetBundle(c.Context(), &pb.GetByIDRequest{Id: id})
 	if err != nil {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": err.Error()})
@@ -181,7 +186,8 @@ func (h *promotionHandler) ListBundles(c *fiber.Ctx) error {
 }
 
 func (h *promotionHandler) UpdateBundle(c *fiber.Ctx) error {
-	id, _ := strconv.ParseUint(c.Params("id"), 10, 64)
+	// Diperbaiki: Menggunakan ID sebagai string, bukan uint64
+	id := c.Params("id")
 	var req pb.UpdateBundleRequest
 	if err := c.BodyParser(&req); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
@@ -195,7 +201,8 @@ func (h *promotionHandler) UpdateBundle(c *fiber.Ctx) error {
 }
 
 func (h *promotionHandler) DeleteBundle(c *fiber.Ctx) error {
-	id, _ := strconv.ParseUint(c.Params("id"), 10, 64)
+	// Diperbaiki: Menggunakan ID sebagai string, bukan uint64
+	id := c.Params("id")
 	res, err := h.client.DeleteBundle(c.Context(), &pb.GetByIDRequest{Id: id})
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})

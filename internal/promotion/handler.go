@@ -3,6 +3,7 @@ package promotion
 import (
 	"context"
 
+	"github.com/google/uuid"
 	promotionpb "github.com/ryannovarypradana/fnb-microservice-api/pkg/grpc/protoc/promotion"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -28,7 +29,12 @@ func (h *GrpcHandler) CreateDiscount(ctx context.Context, req *promotionpb.Creat
 }
 
 func (h *GrpcHandler) GetDiscount(ctx context.Context, req *promotionpb.GetByIDRequest) (*promotionpb.Discount, error) {
-	discount, err := h.service.GetDiscountByID(ctx, req.Id)
+	id, err := uuid.Parse(req.Id)
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "invalid discount ID format: %v", err)
+	}
+
+	discount, err := h.service.GetDiscountByID(ctx, id)
 	if err != nil {
 		return nil, status.Errorf(codes.NotFound, "discount not found: %v", err)
 	}
@@ -44,7 +50,12 @@ func (h *GrpcHandler) UpdateDiscount(ctx context.Context, req *promotionpb.Updat
 }
 
 func (h *GrpcHandler) DeleteDiscount(ctx context.Context, req *promotionpb.GetByIDRequest) (*promotionpb.DeleteResponse, error) {
-	if err := h.service.DeleteDiscount(ctx, req.Id); err != nil {
+	id, err := uuid.Parse(req.Id)
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "invalid discount ID format: %v", err)
+	}
+
+	if err := h.service.DeleteDiscount(ctx, id); err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to delete discount: %v", err)
 	}
 	return &promotionpb.DeleteResponse{Message: "Discount deleted successfully"}, nil
@@ -72,7 +83,12 @@ func (h *GrpcHandler) CreateVoucher(ctx context.Context, req *promotionpb.Create
 }
 
 func (h *GrpcHandler) GetVoucher(ctx context.Context, req *promotionpb.GetByIDRequest) (*promotionpb.Voucher, error) {
-	voucher, err := h.service.GetVoucherByID(ctx, req.Id)
+	id, err := uuid.Parse(req.Id)
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "invalid voucher ID format: %v", err)
+	}
+
+	voucher, err := h.service.GetVoucherByID(ctx, id)
 	if err != nil {
 		return nil, status.Errorf(codes.NotFound, "voucher not found: %v", err)
 	}
@@ -88,7 +104,12 @@ func (h *GrpcHandler) UpdateVoucher(ctx context.Context, req *promotionpb.Update
 }
 
 func (h *GrpcHandler) DeleteVoucher(ctx context.Context, req *promotionpb.GetByIDRequest) (*promotionpb.DeleteResponse, error) {
-	if err := h.service.DeleteVoucher(ctx, req.Id); err != nil {
+	id, err := uuid.Parse(req.Id)
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "invalid voucher ID format: %v", err)
+	}
+
+	if err := h.service.DeleteVoucher(ctx, id); err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to delete voucher: %v", err)
 	}
 	return &promotionpb.DeleteResponse{Message: "Voucher deleted successfully"}, nil
@@ -116,7 +137,12 @@ func (h *GrpcHandler) CreateBundle(ctx context.Context, req *promotionpb.CreateB
 }
 
 func (h *GrpcHandler) GetBundle(ctx context.Context, req *promotionpb.GetByIDRequest) (*promotionpb.Bundle, error) {
-	bundle, err := h.service.GetBundleByID(ctx, req.Id)
+	id, err := uuid.Parse(req.Id)
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "invalid bundle ID format: %v", err)
+	}
+
+	bundle, err := h.service.GetBundleByID(ctx, id)
 	if err != nil {
 		return nil, status.Errorf(codes.NotFound, "bundle not found: %v", err)
 	}
@@ -132,7 +158,12 @@ func (h *GrpcHandler) UpdateBundle(ctx context.Context, req *promotionpb.UpdateB
 }
 
 func (h *GrpcHandler) DeleteBundle(ctx context.Context, req *promotionpb.GetByIDRequest) (*promotionpb.DeleteResponse, error) {
-	if err := h.service.DeleteBundle(ctx, req.Id); err != nil {
+	id, err := uuid.Parse(req.Id)
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "invalid bundle ID format: %v", err)
+	}
+
+	if err := h.service.DeleteBundle(ctx, id); err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to delete bundle: %v", err)
 	}
 	return &promotionpb.DeleteResponse{Message: "Bundle deleted successfully"}, nil

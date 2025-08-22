@@ -117,4 +117,16 @@ func SetupRoutes(app *fiber.App, cfg *config.Config, handlers *handler.Handlers)
 		orders.Put("/:id/items", middleware.Authorize(model.RoleStoreAdmin, model.RoleCashier, model.RoleAdmin), handlers.Order.UpdateOrderItems)
 		orders.Post("/:id/confirm-payment", middleware.Authorize(model.RoleStoreAdmin, model.RoleCashier, model.RoleAdmin), handlers.Order.ConfirmPayment)
 	}
+
+	pos := authRequired.Group("/pos", middleware.Authorize(model.RoleCashier, model.RoleStoreAdmin, model.RoleAdmin))
+	{
+		// Mengambil menu berdasarkan kode atau ID toko
+		pos.Get("/stores/by-code/:storeCode/menus", handlers.Product.GetMenusByStoreCode)
+		pos.Get("/stores/by-id/:id/menus", handlers.Product.GetMenusByStoreID)
+		pos.Get("/menus/:id", handlers.Product.GetMenuByID)
+
+		// Mengambil kategori berdasarkan kode atau ID toko
+		pos.Get("/stores/by-code/:storeCode/categories", handlers.Product.GetCategoriesByStoreCode)
+		pos.Get("/stores/by-id/:id/categories", handlers.Product.GetCategoriesByStoreID)
+	}
 }

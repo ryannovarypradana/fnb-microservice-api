@@ -24,11 +24,12 @@ const _ = grpc.SupportPackageIsVersion7
 type StoreServiceClient interface {
 	CreateStore(ctx context.Context, in *CreateStoreRequest, opts ...grpc.CallOption) (*CreateStoreResponse, error)
 	GetStore(ctx context.Context, in *GetStoreRequest, opts ...grpc.CallOption) (*GetStoreResponse, error)
+	// RPC BARU untuk kebutuhan POS
+	GetStoreByCode(ctx context.Context, in *GetStoreByCodeRequest, opts ...grpc.CallOption) (*GetStoreResponse, error)
 	GetAllStores(ctx context.Context, in *GetAllStoresRequest, opts ...grpc.CallOption) (*GetAllStoresResponse, error)
 	UpdateStore(ctx context.Context, in *UpdateStoreRequest, opts ...grpc.CallOption) (*GetStoreResponse, error)
 	DeleteStore(ctx context.Context, in *DeleteStoreRequest, opts ...grpc.CallOption) (*DeleteStoreResponse, error)
 	CloneStoreContent(ctx context.Context, in *CloneStoreContentRequest, opts ...grpc.CallOption) (*CloneStoreContentResponse, error)
-	GetStoreByCode(ctx context.Context, in *GetStoreByCodeRequest, opts ...grpc.CallOption) (*GetStoreResponse, error)
 }
 
 type storeServiceClient struct {
@@ -51,6 +52,15 @@ func (c *storeServiceClient) CreateStore(ctx context.Context, in *CreateStoreReq
 func (c *storeServiceClient) GetStore(ctx context.Context, in *GetStoreRequest, opts ...grpc.CallOption) (*GetStoreResponse, error) {
 	out := new(GetStoreResponse)
 	err := c.cc.Invoke(ctx, "/store.StoreService/GetStore", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *storeServiceClient) GetStoreByCode(ctx context.Context, in *GetStoreByCodeRequest, opts ...grpc.CallOption) (*GetStoreResponse, error) {
+	out := new(GetStoreResponse)
+	err := c.cc.Invoke(ctx, "/store.StoreService/GetStoreByCode", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -93,26 +103,18 @@ func (c *storeServiceClient) CloneStoreContent(ctx context.Context, in *CloneSto
 	return out, nil
 }
 
-func (c *storeServiceClient) GetStoreByCode(ctx context.Context, in *GetStoreByCodeRequest, opts ...grpc.CallOption) (*GetStoreResponse, error) {
-	out := new(GetStoreResponse)
-	err := c.cc.Invoke(ctx, "/store.StoreService/GetStoreByCode", in, out, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
 // StoreServiceServer is the server API for StoreService service.
 // All implementations must embed UnimplementedStoreServiceServer
 // for forward compatibility
 type StoreServiceServer interface {
 	CreateStore(context.Context, *CreateStoreRequest) (*CreateStoreResponse, error)
 	GetStore(context.Context, *GetStoreRequest) (*GetStoreResponse, error)
+	// RPC BARU untuk kebutuhan POS
+	GetStoreByCode(context.Context, *GetStoreByCodeRequest) (*GetStoreResponse, error)
 	GetAllStores(context.Context, *GetAllStoresRequest) (*GetAllStoresResponse, error)
 	UpdateStore(context.Context, *UpdateStoreRequest) (*GetStoreResponse, error)
 	DeleteStore(context.Context, *DeleteStoreRequest) (*DeleteStoreResponse, error)
 	CloneStoreContent(context.Context, *CloneStoreContentRequest) (*CloneStoreContentResponse, error)
-	GetStoreByCode(context.Context, *GetStoreByCodeRequest) (*GetStoreResponse, error)
 	mustEmbedUnimplementedStoreServiceServer()
 }
 
@@ -126,6 +128,9 @@ func (UnimplementedStoreServiceServer) CreateStore(context.Context, *CreateStore
 func (UnimplementedStoreServiceServer) GetStore(context.Context, *GetStoreRequest) (*GetStoreResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetStore not implemented")
 }
+func (UnimplementedStoreServiceServer) GetStoreByCode(context.Context, *GetStoreByCodeRequest) (*GetStoreResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetStoreByCode not implemented")
+}
 func (UnimplementedStoreServiceServer) GetAllStores(context.Context, *GetAllStoresRequest) (*GetAllStoresResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetAllStores not implemented")
 }
@@ -137,9 +142,6 @@ func (UnimplementedStoreServiceServer) DeleteStore(context.Context, *DeleteStore
 }
 func (UnimplementedStoreServiceServer) CloneStoreContent(context.Context, *CloneStoreContentRequest) (*CloneStoreContentResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CloneStoreContent not implemented")
-}
-func (UnimplementedStoreServiceServer) GetStoreByCode(context.Context, *GetStoreByCodeRequest) (*GetStoreResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GetStoreByCode not implemented")
 }
 func (UnimplementedStoreServiceServer) mustEmbedUnimplementedStoreServiceServer() {}
 
@@ -186,6 +188,24 @@ func _StoreService_GetStore_Handler(srv interface{}, ctx context.Context, dec fu
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(StoreServiceServer).GetStore(ctx, req.(*GetStoreRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _StoreService_GetStoreByCode_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetStoreByCodeRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(StoreServiceServer).GetStoreByCode(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/store.StoreService/GetStoreByCode",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(StoreServiceServer).GetStoreByCode(ctx, req.(*GetStoreByCodeRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -262,24 +282,6 @@ func _StoreService_CloneStoreContent_Handler(srv interface{}, ctx context.Contex
 	return interceptor(ctx, in, info, handler)
 }
 
-func _StoreService_GetStoreByCode_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(GetStoreByCodeRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(StoreServiceServer).GetStoreByCode(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: "/store.StoreService/GetStoreByCode",
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(StoreServiceServer).GetStoreByCode(ctx, req.(*GetStoreByCodeRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
 // StoreService_ServiceDesc is the grpc.ServiceDesc for StoreService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -296,6 +298,10 @@ var StoreService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _StoreService_GetStore_Handler,
 		},
 		{
+			MethodName: "GetStoreByCode",
+			Handler:    _StoreService_GetStoreByCode_Handler,
+		},
+		{
 			MethodName: "GetAllStores",
 			Handler:    _StoreService_GetAllStores_Handler,
 		},
@@ -310,10 +316,6 @@ var StoreService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "CloneStoreContent",
 			Handler:    _StoreService_CloneStoreContent_Handler,
-		},
-		{
-			MethodName: "GetStoreByCode",
-			Handler:    _StoreService_GetStoreByCode_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

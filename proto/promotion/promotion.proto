@@ -9,7 +9,7 @@ import "google/protobuf/empty.proto";
 
 // ========== Generic Messages ==========
 message GetByIDRequest {
-    uint64 id = 1;
+    string id = 1;
 }
 
 message DeleteResponse {
@@ -18,7 +18,7 @@ message DeleteResponse {
 
 // ========== Discount ==========
 message Discount {
-    uint64 id = 1;
+    string id = 1;
     string name = 2;
     string type = 3; // e.g., "PERCENTAGE", "FIXED_AMOUNT"
     double value = 4;
@@ -35,7 +35,7 @@ message CreateDiscountRequest {
 }
 
 message UpdateDiscountRequest {
-    uint64 id = 1;
+    string id = 1;
     string name = 2;
     string type = 3;
     double value = 4;
@@ -50,7 +50,7 @@ message ListDiscountsResponse {
 
 // ========== Voucher ==========
 message Voucher {
-    uint64 id = 1;
+    string id = 1;
     string code = 2;
     string type = 3;
     double value = 4;
@@ -69,7 +69,7 @@ message CreateVoucherRequest {
 }
 
 message UpdateVoucherRequest {
-    uint64 id = 1;
+    string id = 1;
     string code = 2;
     string type = 3;
     double value = 4;
@@ -84,23 +84,23 @@ message ListVouchersResponse {
 
 // ========== Bundle ==========
 message Bundle {
-    uint64 id = 1;
+    string id = 1;
     string name = 2;
     double price = 3;
-    repeated uint64 product_ids = 4;
+    repeated string product_ids = 4;
 }
 
 message CreateBundleRequest {
     string name = 1;
     double price = 2;
-    repeated uint64 product_ids = 3;
+    repeated string product_ids = 3;
 }
 
 message UpdateBundleRequest {
-    uint64 id = 1;
+    string id = 1;
     string name = 2;
     double price = 3;
-    repeated uint64 product_ids = 4;
+    repeated string product_ids = 4;
 }
 
 message ListBundlesResponse {

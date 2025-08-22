@@ -1,14 +1,13 @@
-// pkg/grpc/handler/product_handler.go
-
 package handler
 
 import (
 	"context"
-	"strconv"
+	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/ryannovarypradana/fnb-microservice-api/pkg/dto"
 	"github.com/ryannovarypradana/fnb-microservice-api/pkg/grpc/protoc/product"
+	"github.com/ryannovarypradana/fnb-microservice-api/pkg/grpc/protoc/store"
 )
 
 // ProductHandler adalah interface untuk handler produk (Menu dan Kategori) di API Gateway.
@@ -24,15 +23,26 @@ type ProductHandler interface {
 	GetCategoryByID(c *fiber.Ctx) error
 	UpdateCategory(c *fiber.Ctx) error
 	DeleteCategory(c *fiber.Ctx) error
+
+	// --- POS Handlers ---
+	GetMenusByStoreCode(c *fiber.Ctx) error
+	GetMenusByStoreID(c *fiber.Ctx) error
+	GetCategoriesByStoreCode(c *fiber.Ctx) error
+	GetCategoriesByStoreID(c *fiber.Ctx) error
 }
 
 type productHandler struct {
-	client product.ProductServiceClient
+	productClient product.ProductServiceClient
+	storeClient   store.StoreServiceClient // <-- DEPENDENCY BARU
 }
 
 // NewProductHandler membuat instance baru dari productHandler.
-func NewProductHandler(client product.ProductServiceClient) ProductHandler {
-	return &productHandler{client: client}
+// Perhatikan penambahan storeClient sebagai parameter.
+func NewProductHandler(productClient product.ProductServiceClient, storeClient store.StoreServiceClient) ProductHandler {
+	return &productHandler{
+		productClient: productClient,
+		storeClient:   storeClient,
+	}
 }
 
 // ============== MENU HANDLERS ==============
@@ -51,11 +61,11 @@ func (h *productHandler) CreateMenu(c *fiber.Ctx) error {
 		Description: req.Description,
 		Price:       req.Price,
 		ImageUrl:    req.ImageURL,
-		CategoryId:  int64(req.CategoryID),
-		StoreId:     int64(req.StoreID),
+		CategoryId:  req.CategoryID, // Diperbaiki: Menggunakan string
+		StoreId:     req.StoreID,    // Diperbaiki: Menggunakan string
 	}
 
-	res, err := h.client.CreateMenu(context.Background(), grpcRequest)
+	res, err := h.productClient.CreateMenu(c.Context(), grpcRequest)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": err.Error(),
@@ -67,18 +77,13 @@ func (h *productHandler) CreateMenu(c *fiber.Ctx) error {
 
 // GetMenuByID menangani permintaan HTTP untuk mencari satu menu berdasarkan ID.
 func (h *productHandler) GetMenuByID(c *fiber.Ctx) error {
-	menuID, err := strconv.ParseInt(c.Params("id"), 10, 64)
-	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "Invalid Menu ID",
-		})
-	}
+	menuID := c.Params("id")
 
 	grpcRequest := &product.GetMenuByIDRequest{
 		MenuId: menuID,
 	}
 
-	res, err := h.client.GetMenuByID(context.Background(), grpcRequest)
+	res, err := h.productClient.GetMenuByID(c.Context(), grpcRequest)
 	if err != nil {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
 			"error": err.Error(),
@@ -90,10 +95,7 @@ func (h *productHandler) GetMenuByID(c *fiber.Ctx) error {
 
 // UpdateMenu menangani permintaan HTTP untuk memperbarui menu.
 func (h *productHandler) UpdateMenu(c *fiber.Ctx) error {
-	menuID, err := strconv.ParseInt(c.Params("id"), 10, 64)
-	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid Menu ID"})
-	}
+	menuID := c.Params("id")
 
 	var req dto.UpdateMenuRequest
 	if err := c.BodyParser(&req); err != nil {
@@ -106,10 +108,10 @@ func (h *productHandler) UpdateMenu(c *fiber.Ctx) error {
 		Description: req.Description,
 		Price:       req.Price,
 		ImageUrl:    req.ImageURL,
-		CategoryId:  int64(req.CategoryID),
+		CategoryId:  req.CategoryID, // Diperbaiki: Menggunakan string
 	}
 
-	res, err := h.client.UpdateMenu(c.Context(), grpcRequest)
+	res, err := h.productClient.UpdateMenu(c.Context(), grpcRequest)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 	}
@@ -119,14 +121,11 @@ func (h *productHandler) UpdateMenu(c *fiber.Ctx) error {
 
 // DeleteMenu menangani permintaan HTTP untuk menghapus menu.
 func (h *productHandler) DeleteMenu(c *fiber.Ctx) error {
-	menuID, err := strconv.ParseInt(c.Params("id"), 10, 64)
-	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid Menu ID"})
-	}
+	menuID := c.Params("id")
 
 	grpcRequest := &product.DeleteMenuRequest{MenuId: menuID}
 
-	res, err := h.client.DeleteMenu(c.Context(), grpcRequest)
+	res, err := h.productClient.DeleteMenu(c.Context(), grpcRequest)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 	}
@@ -145,10 +144,10 @@ func (h *productHandler) CreateCategory(c *fiber.Ctx) error {
 
 	grpcRequest := &product.CreateCategoryRequest{
 		Name:    req.Name,
-		StoreId: int64(req.StoreID),
+		StoreId: req.StoreID, // Diperbaiki: Menggunakan string
 	}
 
-	res, err := h.client.CreateCategory(c.Context(), grpcRequest)
+	res, err := h.productClient.CreateCategory(c.Context(), grpcRequest)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 	}
@@ -157,14 +156,11 @@ func (h *productHandler) CreateCategory(c *fiber.Ctx) error {
 
 // GetCategoryByID menangani permintaan HTTP untuk mencari satu kategori berdasarkan ID.
 func (h *productHandler) GetCategoryByID(c *fiber.Ctx) error {
-	categoryID, err := strconv.ParseInt(c.Params("id"), 10, 64)
-	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid Category ID"})
-	}
+	categoryID := c.Params("id")
 
 	grpcRequest := &product.GetCategoryByIDRequest{CategoryId: categoryID}
 
-	res, err := h.client.GetCategoryByID(c.Context(), grpcRequest)
+	res, err := h.productClient.GetCategoryByID(c.Context(), grpcRequest)
 	if err != nil {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": err.Error()})
 	}
@@ -174,10 +170,7 @@ func (h *productHandler) GetCategoryByID(c *fiber.Ctx) error {
 
 // UpdateCategory menangani permintaan HTTP untuk memperbarui kategori.
 func (h *productHandler) UpdateCategory(c *fiber.Ctx) error {
-	categoryID, err := strconv.ParseInt(c.Params("id"), 10, 64)
-	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid Category ID"})
-	}
+	categoryID := c.Params("id")
 
 	var req dto.UpdateCategoryRequest
 	if err := c.BodyParser(&req); err != nil {
@@ -189,7 +182,7 @@ func (h *productHandler) UpdateCategory(c *fiber.Ctx) error {
 		Name:       req.Name,
 	}
 
-	res, err := h.client.UpdateCategory(c.Context(), grpcRequest)
+	res, err := h.productClient.UpdateCategory(c.Context(), grpcRequest) // Diperbaiki: Menggunakan h.productClient
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 	}
@@ -199,17 +192,87 @@ func (h *productHandler) UpdateCategory(c *fiber.Ctx) error {
 
 // DeleteCategory menangani permintaan HTTP untuk menghapus kategori.
 func (h *productHandler) DeleteCategory(c *fiber.Ctx) error {
-	categoryID, err := strconv.ParseInt(c.Params("id"), 10, 64)
-	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid Category ID"})
-	}
+	categoryID := c.Params("id")
 
 	grpcRequest := &product.DeleteCategoryRequest{CategoryId: categoryID}
 
-	res, err := h.client.DeleteCategory(c.Context(), grpcRequest)
+	res, err := h.productClient.DeleteCategory(c.Context(), grpcRequest)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 	}
 
 	return c.Status(fiber.StatusOK).JSON(res)
+}
+
+// ============== POS HANDLERS ==============
+
+// GetMenusByStoreCode mengambil menu berdasarkan store code
+func (h *productHandler) GetMenusByStoreCode(c *fiber.Ctx) error {
+	storeCode := c.Params("storeCode")
+	ctx, cancel := context.WithTimeout(c.Context(), 15*time.Second)
+	defer cancel()
+
+	// 1. Panggil store-service untuk mendapatkan ID toko
+	storeRes, err := h.storeClient.GetStoreByCode(ctx, &store.GetStoreByCodeRequest{StoreCode: storeCode})
+	if err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "store not found"})
+	}
+
+	// 2. Gunakan ID toko untuk mengambil menu dari product-service
+	menusRes, err := h.productClient.GetMenusByStoreID(ctx, &product.GetMenusByStoreIDRequest{StoreId: storeRes.Store.Id})
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "failed to get menus for the store"})
+	}
+
+	return c.Status(fiber.StatusOK).JSON(menusRes)
+}
+
+// GetMenusByStoreID mengambil menu berdasarkan ID toko
+func (h *productHandler) GetMenusByStoreID(c *fiber.Ctx) error {
+	id := c.Params("id")
+
+	ctx, cancel := context.WithTimeout(c.Context(), 15*time.Second)
+	defer cancel()
+
+	menusRes, err := h.productClient.GetMenusByStoreID(ctx, &product.GetMenusByStoreIDRequest{StoreId: id})
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "failed to get menus"})
+	}
+
+	return c.Status(fiber.StatusOK).JSON(menusRes)
+}
+
+// GetCategoriesByStoreCode mengambil kategori berdasarkan store code
+func (h *productHandler) GetCategoriesByStoreCode(c *fiber.Ctx) error {
+	storeCode := c.Params("storeCode")
+	ctx, cancel := context.WithTimeout(c.Context(), 15*time.Second)
+	defer cancel()
+
+	// 1. Panggil store-service untuk mendapatkan ID toko
+	storeRes, err := h.storeClient.GetStoreByCode(ctx, &store.GetStoreByCodeRequest{StoreCode: storeCode})
+	if err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "store not found"})
+	}
+
+	// 2. Gunakan ID toko untuk mengambil kategori dari product-service
+	categoriesRes, err := h.productClient.GetCategoriesByStoreID(ctx, &product.GetCategoriesByStoreIDRequest{StoreId: storeRes.Store.Id})
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "failed to get categories for the store"})
+	}
+
+	return c.Status(fiber.StatusOK).JSON(categoriesRes)
+}
+
+// GetCategoriesByStoreID mengambil kategori berdasarkan ID toko
+func (h *productHandler) GetCategoriesByStoreID(c *fiber.Ctx) error {
+	id := c.Params("id")
+
+	ctx, cancel := context.WithTimeout(c.Context(), 15*time.Second)
+	defer cancel()
+
+	categoriesRes, err := h.productClient.GetCategoriesByStoreID(ctx, &product.GetCategoriesByStoreIDRequest{StoreId: id})
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "failed to get categories"})
+	}
+	return c.Status(fiber.StatusOK).JSON(categoriesRes)
 }

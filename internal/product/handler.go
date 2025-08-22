@@ -4,10 +4,10 @@ import (
 	"context"
 	"time"
 
+	"github.com/google/uuid"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	// Blok import yang divalidasi
 	"github.com/ryannovarypradana/fnb-microservice-api/pkg/grpc/protoc/product"
 	"github.com/ryannovarypradana/fnb-microservice-api/pkg/model"
 )
@@ -24,13 +24,22 @@ func NewProductGRPCHandler(service IService) *ProductGRPCHandler {
 // --- Menu RPC Handlers ---
 
 func (h *ProductGRPCHandler) CreateMenu(ctx context.Context, req *product.CreateMenuRequest) (*product.CreateMenuResponse, error) {
+	categoryID, err := uuid.Parse(req.GetCategoryId())
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "Invalid Category ID format: %v", err)
+	}
+	storeID, err := uuid.Parse(req.GetStoreId())
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "Invalid Store ID format: %v", err)
+	}
+
 	menu := &model.Menu{
-		Name:        req.Name,
-		Description: req.Description,
-		Price:       req.Price,
-		ImageURL:    req.ImageUrl,
-		CategoryID:  uint(req.CategoryId),
-		StoreID:     uint(req.StoreId),
+		Name:        req.GetName(),
+		Description: req.GetDescription(),
+		Price:       req.GetPrice(),
+		ImageURL:    req.GetImageUrl(),
+		CategoryID:  categoryID,
+		StoreID:     storeID,
 	}
 
 	if err := h.service.CreateMenu(ctx, menu); err != nil {
@@ -41,7 +50,12 @@ func (h *ProductGRPCHandler) CreateMenu(ctx context.Context, req *product.Create
 }
 
 func (h *ProductGRPCHandler) GetMenuByID(ctx context.Context, req *product.GetMenuByIDRequest) (*product.GetMenuByIDResponse, error) {
-	menu, err := h.service.GetMenuByID(ctx, uint(req.MenuId))
+	menuID, err := uuid.Parse(req.GetMenuId())
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "Invalid Menu ID format: %v", err)
+	}
+
+	menu, err := h.service.GetMenuByID(ctx, menuID)
 	if err != nil {
 		return nil, status.Errorf(codes.NotFound, "Menu not found: %v", err)
 	}
@@ -49,19 +63,28 @@ func (h *ProductGRPCHandler) GetMenuByID(ctx context.Context, req *product.GetMe
 }
 
 func (h *ProductGRPCHandler) UpdateMenu(ctx context.Context, req *product.UpdateMenuRequest) (*product.UpdateMenuResponse, error) {
-	updatedMenu := &model.Menu{
-		Name:        req.Name,
-		Description: req.Description,
-		Price:       req.Price,
-		ImageURL:    req.ImageUrl,
-		CategoryID:  uint(req.CategoryId),
+	menuID, err := uuid.Parse(req.GetMenuId())
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "Invalid Menu ID format: %v", err)
+	}
+	categoryID, err := uuid.Parse(req.GetCategoryId())
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "Invalid Category ID format: %v", err)
 	}
 
-	if err := h.service.UpdateMenu(ctx, uint(req.MenuId), updatedMenu); err != nil {
+	updatedMenu := &model.Menu{
+		Name:        req.GetName(),
+		Description: req.GetDescription(),
+		Price:       req.GetPrice(),
+		ImageURL:    req.GetImageUrl(),
+		CategoryID:  categoryID,
+	}
+
+	if err := h.service.UpdateMenu(ctx, menuID, updatedMenu); err != nil {
 		return nil, status.Errorf(codes.Internal, "Failed to update menu: %v", err)
 	}
 
-	menu, err := h.service.GetMenuByID(ctx, uint(req.MenuId))
+	menu, err := h.service.GetMenuByID(ctx, menuID)
 	if err != nil {
 		return nil, status.Errorf(codes.NotFound, "Could not retrieve updated menu: %v", err)
 	}
@@ -70,14 +93,23 @@ func (h *ProductGRPCHandler) UpdateMenu(ctx context.Context, req *product.Update
 }
 
 func (h *ProductGRPCHandler) DeleteMenu(ctx context.Context, req *product.DeleteMenuRequest) (*product.DeleteMenuResponse, error) {
-	if err := h.service.DeleteMenu(ctx, uint(req.MenuId)); err != nil {
+	menuID, err := uuid.Parse(req.GetMenuId())
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "Invalid Menu ID format: %v", err)
+	}
+	if err := h.service.DeleteMenu(ctx, menuID); err != nil {
 		return nil, status.Errorf(codes.Internal, "Failed to delete menu: %v", err)
 	}
 	return &product.DeleteMenuResponse{Message: "Menu deleted successfully"}, nil
 }
 
 func (h *ProductGRPCHandler) GetMenusByStoreID(ctx context.Context, req *product.GetMenusByStoreIDRequest) (*product.GetMenusByStoreIDResponse, error) {
-	menus, err := h.service.GetMenusByStoreID(ctx, uint(req.StoreId))
+	storeID, err := uuid.Parse(req.GetStoreId())
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "Invalid Store ID format: %v", err)
+	}
+
+	menus, err := h.service.GetMenusByStoreID(ctx, storeID)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "Failed to get menus: %v", err)
 	}
@@ -93,9 +125,14 @@ func (h *ProductGRPCHandler) GetMenusByStoreID(ctx context.Context, req *product
 // --- Category RPC Handlers ---
 
 func (h *ProductGRPCHandler) CreateCategory(ctx context.Context, req *product.CreateCategoryRequest) (*product.CreateCategoryResponse, error) {
+	storeID, err := uuid.Parse(req.GetStoreId())
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "Invalid Store ID format: %v", err)
+	}
+
 	category := &model.Category{
-		Name:    req.Name,
-		StoreID: uint(req.StoreId),
+		Name:    req.GetName(),
+		StoreID: storeID,
 	}
 	if err := h.service.CreateCategory(ctx, category); err != nil {
 		return nil, status.Errorf(codes.Internal, "Failed to create category: %v", err)
@@ -104,7 +141,12 @@ func (h *ProductGRPCHandler) CreateCategory(ctx context.Context, req *product.Cr
 }
 
 func (h *ProductGRPCHandler) GetCategoryByID(ctx context.Context, req *product.GetCategoryByIDRequest) (*product.GetCategoryByIDResponse, error) {
-	category, err := h.service.GetCategoryByID(ctx, uint(req.CategoryId))
+	categoryID, err := uuid.Parse(req.GetCategoryId())
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "Invalid Category ID format: %v", err)
+	}
+
+	category, err := h.service.GetCategoryByID(ctx, categoryID)
 	if err != nil {
 		return nil, status.Errorf(codes.NotFound, "Category not found: %v", err)
 	}
@@ -112,12 +154,17 @@ func (h *ProductGRPCHandler) GetCategoryByID(ctx context.Context, req *product.G
 }
 
 func (h *ProductGRPCHandler) UpdateCategory(ctx context.Context, req *product.UpdateCategoryRequest) (*product.UpdateCategoryResponse, error) {
-	updatedCategory := &model.Category{Name: req.Name}
-	if err := h.service.UpdateCategory(ctx, uint(req.CategoryId), updatedCategory); err != nil {
+	categoryID, err := uuid.Parse(req.GetCategoryId())
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "Invalid Category ID format: %v", err)
+	}
+
+	updatedCategory := &model.Category{Name: req.GetName()}
+	if err := h.service.UpdateCategory(ctx, categoryID, updatedCategory); err != nil {
 		return nil, status.Errorf(codes.Internal, "Failed to update category: %v", err)
 	}
 
-	category, err := h.service.GetCategoryByID(ctx, uint(req.CategoryId))
+	category, err := h.service.GetCategoryByID(ctx, categoryID)
 	if err != nil {
 		return nil, status.Errorf(codes.NotFound, "Could not retrieve updated category: %v", err)
 	}
@@ -126,14 +173,23 @@ func (h *ProductGRPCHandler) UpdateCategory(ctx context.Context, req *product.Up
 }
 
 func (h *ProductGRPCHandler) DeleteCategory(ctx context.Context, req *product.DeleteCategoryRequest) (*product.DeleteCategoryResponse, error) {
-	if err := h.service.DeleteCategory(ctx, uint(req.CategoryId)); err != nil {
+	categoryID, err := uuid.Parse(req.GetCategoryId())
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "Invalid Category ID format: %v", err)
+	}
+	if err := h.service.DeleteCategory(ctx, categoryID); err != nil {
 		return nil, status.Errorf(codes.Internal, "Failed to delete category: %v", err)
 	}
 	return &product.DeleteCategoryResponse{Message: "Category deleted successfully"}, nil
 }
 
 func (h *ProductGRPCHandler) GetCategoriesByStoreID(ctx context.Context, req *product.GetCategoriesByStoreIDRequest) (*product.GetCategoriesByStoreIDResponse, error) {
-	categories, err := h.service.GetCategoriesByStoreID(ctx, uint(req.StoreId))
+	storeID, err := uuid.Parse(req.GetStoreId())
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "Invalid Store ID format: %v", err)
+	}
+
+	categories, err := h.service.GetCategoriesByStoreID(ctx, storeID)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "Failed to get categories: %v", err)
 	}
@@ -152,17 +208,17 @@ func modelMenuToProtoMenu(menu *model.Menu) *product.Menu {
 		return nil
 	}
 	categoryName := ""
-	if menu.Category.ID != 0 {
+	if menu.Category.ID != uuid.Nil {
 		categoryName = menu.Category.Name
 	}
 	return &product.Menu{
-		Id:           int64(menu.ID),
+		Id:           menu.ID.String(),
 		Name:         menu.Name,
 		Description:  menu.Description,
 		Price:        menu.Price,
 		ImageUrl:     menu.ImageURL,
-		CategoryId:   int64(menu.CategoryID),
-		StoreId:      int64(menu.StoreID),
+		CategoryId:   menu.CategoryID.String(),
+		StoreId:      menu.StoreID.String(),
 		CategoryName: categoryName,
 		CreatedAt:    menu.CreatedAt.Format(time.RFC3339),
 		UpdatedAt:    menu.UpdatedAt.Format(time.RFC3339),
@@ -174,9 +230,9 @@ func modelCategoryToProtoCategory(category *model.Category) *product.Category {
 		return nil
 	}
 	return &product.Category{
-		Id:        int64(category.ID),
+		Id:        category.ID.String(),
 		Name:      category.Name,
-		StoreId:   int64(category.StoreID),
+		StoreId:   category.StoreID.String(),
 		CreatedAt: category.CreatedAt.Format(time.RFC3339),
 		UpdatedAt: category.UpdatedAt.Format(time.RFC3339),
 	}

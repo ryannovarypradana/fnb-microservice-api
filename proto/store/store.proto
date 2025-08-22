@@ -32,11 +32,15 @@ message GetStoreResponse {
 
 message GetAllStoresRequest {
     string search = 1;
-    // Anda bisa menambahkan filter lain seperti company_id di sini
+    optional int64 company_id = 2;
 }
 
 message GetAllStoresResponse {
     repeated Store stores = 1;
+}
+
+message GetStoreByCodeRequest {
+    string store_code = 1;
 }
 
 message UpdateStoreRequest {
@@ -77,4 +81,5 @@ service StoreService {
     rpc UpdateStore(UpdateStoreRequest) returns (GetStoreResponse); // Mengembalikan data toko yang diperbarui
     rpc DeleteStore(DeleteStoreRequest) returns (DeleteStoreResponse);
     rpc CloneStoreContent(CloneStoreContentRequest) returns (CloneStoreContentResponse);
+    rpc GetStoreByCode(GetStoreByCodeRequest) returns (GetStoreResponse);
 }

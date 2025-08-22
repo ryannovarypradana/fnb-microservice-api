@@ -58,10 +58,11 @@ func main() {
 
 	// Kumpulkan semua handler
 	handlers := &handler.Handlers{
-		Auth:      handler.NewAuthHandler(authSvc),
-		User:      handler.NewUserHandler(userSvc),
-		Store:     handler.NewStoreHandler(storeSvc),
-		Product:   handler.NewProductHandler(productSvc),
+		Auth:  handler.NewAuthHandler(authSvc),
+		User:  handler.NewUserHandler(userSvc),
+		Store: handler.NewStoreHandler(storeSvc),
+		// DIperbaiki: Menambahkan storeSvc sebagai argumen kedua
+		Product:   handler.NewProductHandler(productSvc, storeSvc),
 		Order:     handler.NewOrderHandler(orderSvc),
 		Company:   handler.NewCompanyHandler(companySvc), // <-- Tambahkan Company Handler
 		Promotion: handler.NewPromotionHandler(promotionSvc),

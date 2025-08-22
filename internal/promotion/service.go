@@ -2,7 +2,9 @@ package promotion
 
 import (
 	"context"
+	"errors"
 
+	"github.com/google/uuid"
 	promotionpb "github.com/ryannovarypradana/fnb-microservice-api/pkg/grpc/protoc/promotion"
 	"github.com/ryannovarypradana/fnb-microservice-api/pkg/model"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -11,23 +13,23 @@ import (
 type Service interface {
 	// Discount methods
 	CreateDiscount(ctx context.Context, req *promotionpb.CreateDiscountRequest) (*model.Discount, error)
-	GetDiscountByID(ctx context.Context, id uint64) (*model.Discount, error)
+	GetDiscountByID(ctx context.Context, id uuid.UUID) (*model.Discount, error)
 	UpdateDiscount(ctx context.Context, req *promotionpb.UpdateDiscountRequest) (*model.Discount, error)
-	DeleteDiscount(ctx context.Context, id uint64) error
+	DeleteDiscount(ctx context.Context, id uuid.UUID) error
 	GetAllDiscounts(ctx context.Context) ([]*model.Discount, error)
 
 	// Voucher methods
 	CreateVoucher(ctx context.Context, req *promotionpb.CreateVoucherRequest) (*model.Voucher, error)
-	GetVoucherByID(ctx context.Context, id uint64) (*model.Voucher, error)
+	GetVoucherByID(ctx context.Context, id uuid.UUID) (*model.Voucher, error)
 	UpdateVoucher(ctx context.Context, req *promotionpb.UpdateVoucherRequest) (*model.Voucher, error)
-	DeleteVoucher(ctx context.Context, id uint64) error
+	DeleteVoucher(ctx context.Context, id uuid.UUID) error
 	GetAllVouchers(ctx context.Context) ([]*model.Voucher, error)
 
 	// Bundle methods
 	CreateBundle(ctx context.Context, req *promotionpb.CreateBundleRequest) (*model.Bundle, error)
-	GetBundleByID(ctx context.Context, id uint64) (*model.Bundle, error)
+	GetBundleByID(ctx context.Context, id uuid.UUID) (*model.Bundle, error)
 	UpdateBundle(ctx context.Context, req *promotionpb.UpdateBundleRequest) (*model.Bundle, error)
-	DeleteBundle(ctx context.Context, id uint64) error
+	DeleteBundle(ctx context.Context, id uuid.UUID) error
 	GetAllBundles(ctx context.Context) ([]*model.Bundle, error)
 }
 
@@ -54,12 +56,17 @@ func (s *service) CreateDiscount(ctx context.Context, req *promotionpb.CreateDis
 	return discount, nil
 }
 
-func (s *service) GetDiscountByID(ctx context.Context, id uint64) (*model.Discount, error) {
+func (s *service) GetDiscountByID(ctx context.Context, id uuid.UUID) (*model.Discount, error) {
 	return s.repository.FindDiscountByID(id)
 }
 
 func (s *service) UpdateDiscount(ctx context.Context, req *promotionpb.UpdateDiscountRequest) (*model.Discount, error) {
-	discount, err := s.repository.FindDiscountByID(req.Id)
+	id, err := uuid.Parse(req.Id)
+	if err != nil {
+		return nil, errors.New("invalid discount id format")
+	}
+
+	discount, err := s.repository.FindDiscountByID(id)
 	if err != nil {
 		return nil, err
 	}
@@ -75,7 +82,7 @@ func (s *service) UpdateDiscount(ctx context.Context, req *promotionpb.UpdateDis
 	return discount, nil
 }
 
-func (s *service) DeleteDiscount(ctx context.Context, id uint64) error {
+func (s *service) DeleteDiscount(ctx context.Context, id uuid.UUID) error {
 	return s.repository.DeleteDiscount(id)
 }
 
@@ -99,12 +106,17 @@ func (s *service) CreateVoucher(ctx context.Context, req *promotionpb.CreateVouc
 	return voucher, nil
 }
 
-func (s *service) GetVoucherByID(ctx context.Context, id uint64) (*model.Voucher, error) {
+func (s *service) GetVoucherByID(ctx context.Context, id uuid.UUID) (*model.Voucher, error) {
 	return s.repository.FindVoucherByID(id)
 }
 
 func (s *service) UpdateVoucher(ctx context.Context, req *promotionpb.UpdateVoucherRequest) (*model.Voucher, error) {
-	voucher, err := s.repository.FindVoucherByID(req.Id)
+	id, err := uuid.Parse(req.Id)
+	if err != nil {
+		return nil, errors.New("invalid voucher id format")
+	}
+
+	voucher, err := s.repository.FindVoucherByID(id)
 	if err != nil {
 		return nil, err
 	}
@@ -121,7 +133,7 @@ func (s *service) UpdateVoucher(ctx context.Context, req *promotionpb.UpdateVouc
 	return voucher, nil
 }
 
-func (s *service) DeleteVoucher(ctx context.Context, id uint64) error {
+func (s *service) DeleteVoucher(ctx context.Context, id uuid.UUID) error {
 	return s.repository.DeleteVoucher(id)
 }
 
@@ -131,9 +143,13 @@ func (s *service) GetAllVouchers(ctx context.Context) ([]*model.Voucher, error) 
 
 // ========== Bundle Service Implementation ==========
 func (s *service) CreateBundle(ctx context.Context, req *promotionpb.CreateBundleRequest) (*model.Bundle, error) {
-	productIDs := make([]uint, len(req.ProductIds))
-	for i, id := range req.ProductIds {
-		productIDs[i] = uint(id)
+	productIDs := make([]uuid.UUID, len(req.ProductIds))
+	for i, idStr := range req.ProductIds {
+		id, err := uuid.Parse(idStr)
+		if err != nil {
+			return nil, errors.New("invalid product id format in bundle request")
+		}
+		productIDs[i] = id
 	}
 
 	bundle := &model.Bundle{
@@ -148,19 +164,28 @@ func (s *service) CreateBundle(ctx context.Context, req *promotionpb.CreateBundl
 	return bundle, nil
 }
 
-func (s *service) GetBundleByID(ctx context.Context, id uint64) (*model.Bundle, error) {
+func (s *service) GetBundleByID(ctx context.Context, id uuid.UUID) (*model.Bundle, error) {
 	return s.repository.FindBundleByID(id)
 }
 
 func (s *service) UpdateBundle(ctx context.Context, req *promotionpb.UpdateBundleRequest) (*model.Bundle, error) {
-	bundle, err := s.repository.FindBundleByID(req.Id)
+	id, err := uuid.Parse(req.Id)
+	if err != nil {
+		return nil, errors.New("invalid bundle id format")
+	}
+
+	bundle, err := s.repository.FindBundleByID(id)
 	if err != nil {
 		return nil, err
 	}
 
-	productIDs := make([]uint, len(req.ProductIds))
-	for i, id := range req.ProductIds {
-		productIDs[i] = uint(id)
+	productIDs := make([]uuid.UUID, len(req.ProductIds))
+	for i, idStr := range req.ProductIds {
+		id, err := uuid.Parse(idStr)
+		if err != nil {
+			return nil, errors.New("invalid product id format in bundle request")
+		}
+		productIDs[i] = id
 	}
 
 	bundle.Name = req.Name
@@ -173,7 +198,7 @@ func (s *service) UpdateBundle(ctx context.Context, req *promotionpb.UpdateBundl
 	return bundle, nil
 }
 
-func (s *service) DeleteBundle(ctx context.Context, id uint64) error {
+func (s *service) DeleteBundle(ctx context.Context, id uuid.UUID) error {
 	return s.repository.DeleteBundle(id)
 }
 
@@ -185,7 +210,7 @@ func (s *service) GetAllBundles(ctx context.Context) ([]*model.Bundle, error) {
 
 func ModelToProtoDiscount(d *model.Discount) *promotionpb.Discount {
 	return &promotionpb.Discount{
-		Id:        uint64(d.ID),
+		Id:        d.ID.String(),
 		Name:      d.Name,
 		Type:      d.Type,
 		Value:     d.Value,
@@ -196,7 +221,7 @@ func ModelToProtoDiscount(d *model.Discount) *promotionpb.Discount {
 
 func ModelToProtoVoucher(v *model.Voucher) *promotionpb.Voucher {
 	return &promotionpb.Voucher{
-		Id:        uint64(v.ID),
+		Id:        v.ID.String(),
 		Code:      v.Code,
 		Type:      v.Type,
 		Value:     v.Value,
@@ -207,12 +232,12 @@ func ModelToProtoVoucher(v *model.Voucher) *promotionpb.Voucher {
 }
 
 func ModelToProtoBundle(b *model.Bundle) *promotionpb.Bundle {
-	pids := make([]uint64, len(b.ProductIDs))
+	pids := make([]string, len(b.ProductIDs))
 	for i, id := range b.ProductIDs {
-		pids[i] = uint64(id)
+		pids[i] = id.String()
 	}
 	return &promotionpb.Bundle{
-		Id:         uint64(b.ID),
+		Id:         b.ID.String(),
 		Name:       b.Name,
 		Price:      b.Price,
 		ProductIds: pids,
