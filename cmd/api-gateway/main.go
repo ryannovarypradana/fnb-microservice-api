@@ -54,7 +54,12 @@ func main() {
 
 	app := fiber.New()
 	app.Use(logger.New())
-	app.Use(cors.New())
+	app.Use(cors.New(cors.Config{
+		AllowOrigins:     "http://localhost:3000", // Izinkan frontend Anda
+		AllowHeaders:     "Origin, Content-Type, Accept, Authorization",
+		AllowMethods:     "GET,POST,HEAD,PUT,DELETE,PATCH,OPTIONS",
+		AllowCredentials: true,
+	}))
 
 	// Kumpulkan semua handler
 	handlers := &handler.Handlers{

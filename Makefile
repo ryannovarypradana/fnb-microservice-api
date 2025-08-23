@@ -9,6 +9,8 @@ SHELL := /bin/bash
 .PHONY: run-all
 run-all:
 	@echo "--- Starting all services with hot-reload ---"
+	@echo "NOTE: Run 'make stop-all' in a separate terminal to stop."
+	@trap 'make stop-all' EXIT
 	@for service_path in $(wildcard cmd/*); do \
 		SERVICE_NAME=$$(basename $$service_path); \
 		echo "--> Starting $$SERVICE_NAME..."; \
@@ -17,14 +19,15 @@ run-all:
 	@echo "\n✅ All services are running in the background."
 	@echo "   Use 'make stop-all' to terminate them."
 	@echo "   Waiting for services to boot..."
-	@sleep 2
+	@# Keep the make command alive to manage background processes
+	@tail -f /dev/null
 
 ## stop-all: Menghentikan semua proses Air dan binary yang berjalan.
 .PHONY: stop-all
 stop-all:
 	@echo "--- Stopping all services ---"
-	@killall -q air || true
-	@killall -q main || true
+	@pkill -f "air" > /dev/null 2>&1 || true
+	@pkill -f "./tmp/main" > /dev/null 2>&1 || true
 	@rm -rf ./tmp
 	@echo "✅ All services stopped."
 
@@ -45,22 +48,24 @@ proto-gen:
 .PHONY: docker-up
 docker-up:
 	@echo "--- Starting all services with Docker Compose ---"
-	docker-compose up
+	@docker-compose up --build
 
 ## docker-down: Menghentikan semua layanan Docker Compose.
 .PHONY: docker-down
 docker-down:
 	@echo "--- Stopping all services in Docker Compose ---"
-	docker-compose down
+	@docker-compose down
 
 ## docker-infra: Hanya menjalankan kontainer infrastruktur (DB, Redis, dll.).
 .PHONY: docker-infra
 docker-infra:
 	@echo "--- Starting infrastructure containers ---"
-	docker-compose up -d postgres redis rabbitmq
+	@docker-compose up -d postgres redis rabbitmq
 
+## proto: Perintah alternatif untuk men-generate kode proto (opsional).
 .PHONY: proto
 proto:
-	rm -rf pkg/grpc/protoc
-	mkdir -p pkg/grpc/protoc
-	protoc -I=proto --go_out=. --go-grpc_out=. proto/**/*.proto # <-- Perintah yang benar ada di sini
+	@echo "--- Cleaning and generating gRPC code ---"
+	@rm -rf pkg/grpc/protoc
+	@mkdir -p pkg/grpc/protoc
+	@protoc -I=proto --go_out=. --go-grpc_out=. proto/**/*.proto

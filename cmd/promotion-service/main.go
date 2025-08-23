@@ -54,7 +54,7 @@ func main() {
 	promotionpb.RegisterPromotionServiceServer(grpcServer, promoHandler)
 
 	// 7. Menjalankan Server
-	fmt.Printf("✅ Promotion service is running and listening on %s\n", cfg.Product.Port)
+	fmt.Printf("✅ Promotion service is running and listening on %s\n", cfg.Promotion.Port)
 	if err := grpcServer.Serve(lis); err != nil {
 		log.Fatalf("Failed to serve gRPC server: %v", err)
 	}

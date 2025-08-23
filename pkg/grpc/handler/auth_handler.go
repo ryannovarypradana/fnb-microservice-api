@@ -1,6 +1,8 @@
 package handler
 
 import (
+	"log"
+
 	"github.com/gofiber/fiber/v2"
 	pb "github.com/ryannovarypradana/fnb-microservice-api/pkg/grpc/protoc/auth"
 )
@@ -14,6 +16,12 @@ func NewAuthHandler(client pb.AuthServiceClient) *AuthHandler {
 }
 
 func (h *AuthHandler) Login(c *fiber.Ctx) error {
+
+	log.Println("====== LOGIN ATTEMPT RECEIVED ======")
+	log.Printf("Request Body: %s", string(c.Body()))
+	log.Printf("Content-Type Header: %s", c.Get("Content-Type"))
+	log.Println("====================================")
+	// ==================================================================
 	req := new(pb.LoginRequest)
 	if err := c.BodyParser(req); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})

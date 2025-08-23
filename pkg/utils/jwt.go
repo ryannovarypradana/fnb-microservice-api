@@ -12,7 +12,7 @@ import (
 // JwtService adalah interface untuk operasi JWT.
 type JwtService interface {
 	// Tambahkan parameter companyID
-	GenerateToken(userID uuid.UUID, companyID string, role string) (string, error)
+	GenerateToken(userID uuid.UUID, email string, companyID string, storeID string, role string) (string, error)
 	VerifyToken(tokenString string) (*model.Claims, error)
 }
 
@@ -33,10 +33,12 @@ func NewJwtService(cfg *config.Config) JwtService {
 }
 
 // GenerateToken sekarang menerima companyID.
-func (s *jwtService) GenerateToken(userID uuid.UUID, companyID string, role string) (string, error) {
+func (s *jwtService) GenerateToken(userID uuid.UUID, email string, companyID string, storeID string, role string) (string, error) {
 	claims := model.Claims{
 		UserID:    userID.String(),
+		Email:     email,
 		CompanyID: companyID, // Tambahkan companyID ke dalam claims
+		StoreID:   storeID,
 		Role:      role,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(s.ttl)),

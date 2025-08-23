@@ -11,6 +11,21 @@ import (
 func SetupRoutes(app *fiber.App, cfg *config.Config, handlers *handler.Handlers) {
 	api := app.Group("/api")
 
+	api.Use(func(c *fiber.Ctx) error {
+		// Periksa apakah method-nya adalah OPTIONS
+		if c.Method() == "OPTIONS" {
+			// Atur header yang sama persis dengan konfigurasi CORS Anda
+			c.Set("Access-Control-Allow-Origin", "http://localhost:3000")
+			c.Set("Access-Control-Allow-Headers", "Origin, Content-Type, Accept, Authorization")
+			c.Set("Access-Control-Allow-Methods", "GET,POST,HEAD,PUT,DELETE,PATCH,OPTIONS")
+			c.Set("Access-Control-Allow-Credentials", "true")
+			// Kirim status 200 OK dan hentikan eksekusi lebih lanjut
+			return c.SendStatus(fiber.StatusOK)
+		}
+		// Jika bukan OPTIONS, lanjutkan ke handler berikutnya
+		return c.Next()
+	})
+
 	// Rute Publik
 	auth := api.Group("/v1/auth")
 	{

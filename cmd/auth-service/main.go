@@ -13,6 +13,7 @@ import (
 	// CORRECTED: Fixed typo 'github.comcom'
 	"github.com/ryannovarypradana/fnb-microservice-api/pkg/database"
 	// CORRECTED: Added missing import
+	"github.com/ryannovarypradana/fnb-microservice-api/pkg/model"
 	"github.com/ryannovarypradana/fnb-microservice-api/pkg/utils"
 )
 
@@ -27,6 +28,12 @@ func main() {
 		log.Fatalf("FATAL: failed to connect to database: %v", err)
 	}
 	log.Println("Database connection successful.")
+
+	log.Println("Migrating database for auth-service...")
+	if err := db.AutoMigrate(&model.User{}); err != nil {
+		log.Fatalf("FATAL: failed to migrate database: %v", err)
+	}
+	log.Println("Migration completed for auth-service.")
 
 	lis, err := net.Listen("tcp", fmt.Sprintf(":%s", cfg.Auth.Port))
 	if err != nil {

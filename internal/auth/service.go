@@ -93,13 +93,17 @@ func (s *authService) Login(ctx context.Context, req *pb.LoginRequest) (string, 
 	}
 
 	// Siapkan companyID sebagai string, tangani jika nil
-	var companyIDStr string
+	var companyIDStr, storeIDStr string
 	if user.CompanyID != nil {
 		companyIDStr = user.CompanyID.String()
 	}
 
+	if user.StoreID != nil {
+		storeIDStr = user.StoreID.String()
+	}
+
 	// Panggil GenerateToken dengan companyID
-	token, err := s.jwtService.GenerateToken(user.ID, companyIDStr, string(user.Role))
+	token, err := s.jwtService.GenerateToken(user.ID, user.Email, companyIDStr, storeIDStr, string(user.Role))
 	if err != nil {
 		return "", errors.New("failed to generate token")
 	}
