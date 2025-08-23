@@ -10,6 +10,7 @@ import (
 
 type StoreRepository interface {
 	Create(ctx context.Context, store *model.Store) error
+	FindByCode(ctx context.Context, code string) (*model.Store, error)
 	FindByID(ctx context.Context, id string) (*model.Store, error)
 	FindAll(ctx context.Context, search string) ([]*model.Store, error)
 	Update(ctx context.Context, store *model.Store) error
@@ -64,4 +65,15 @@ func (r *storeRepository) Delete(ctx context.Context, id string) error {
 		return errors.New("store not found")
 	}
 	return nil
+}
+
+func (r *storeRepository) FindByCode(ctx context.Context, code string) (*model.Store, error) {
+	var store model.Store
+	if err := r.db.WithContext(ctx).Where("code = ?", code).First(&store).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, errors.New("store not found")
+		}
+		return nil, err
+	}
+	return &store, nil
 }

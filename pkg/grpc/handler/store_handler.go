@@ -24,7 +24,6 @@ func (h *StoreHandler) CreateStore(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "invalid company id"})
 	}
 
-	// Change CompanyID to CompanyId to match the generated protobuf struct
 	req.CompanyId = companyID
 
 	res, err := h.client.CreateStore(c.Context(), &req)
@@ -45,6 +44,20 @@ func (h *StoreHandler) GetStore(c *fiber.Ctx) error {
 	return c.JSON(res)
 }
 
+// --- FUNGSI BARU DIMULAI DI SINI ---
+func (h *StoreHandler) GetStoreByCode(c *fiber.Ctx) error {
+	storeCode := c.Params("storeCode")
+	req := &pb.GetStoreByCodeRequest{StoreCode: storeCode}
+
+	res, err := h.client.GetStoreByCode(c.Context(), req)
+	if err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": err.Error()})
+	}
+	return c.JSON(res)
+}
+
+// --- FUNGSI BARU SELESAI DI SINI ---
+
 func (h *StoreHandler) GetAllStores(c *fiber.Ctx) error {
 	searchQuery := c.Query("search")
 	req := &pb.GetAllStoresRequest{Search: searchQuery}
@@ -53,7 +66,7 @@ func (h *StoreHandler) GetAllStores(c *fiber.Ctx) error {
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 	}
-	return c.JSON(res)
+	return c.JSON(res.Stores)
 }
 
 func (h *StoreHandler) UpdateStore(c *fiber.Ctx) error {
@@ -66,7 +79,6 @@ func (h *StoreHandler) UpdateStore(c *fiber.Ctx) error {
 
 	res, err := h.client.UpdateStore(c.Context(), &req)
 	if err != nil {
-		// Logika ini dapat disesuaikan untuk menangani error 'not found' secara spesifik
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 	}
 	return c.JSON(res)

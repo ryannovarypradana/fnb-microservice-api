@@ -12,13 +12,13 @@ import (
 
 // OpeningHours defines the structure for operational hours.
 type OpeningHours struct {
-	Monday    string `json:"monday"`
-	Tuesday   string `json:"tuesday"`
-	Wednesday string `json:"wednesday"`
-	Thursday  string `json:"thursday"`
-	Friday    string `json:"friday"`
-	Saturday  string `json:"saturday"`
-	Sunday    string `json:"sunday"`
+	Monday    interface{} `json:"monday"`
+	Tuesday   interface{} `json:"tuesday"`
+	Wednesday interface{} `json:"wednesday"`
+	Thursday  interface{} `json:"thursday"`
+	Friday    interface{} `json:"friday"`
+	Saturday  interface{} `json:"saturday"`
+	Sunday    interface{} `json:"sunday"`
 }
 
 // GORM support for OpeningHours struct

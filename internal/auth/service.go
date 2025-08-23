@@ -102,6 +102,8 @@ func (s *authService) Login(ctx context.Context, req *pb.LoginRequest) (string, 
 		storeIDStr = user.StoreID.String()
 	}
 
+	log.Printf("Login successful for user ID: %s", user.ID)
+
 	// Panggil GenerateToken dengan companyID
 	token, err := s.jwtService.GenerateToken(user.ID, user.Email, companyIDStr, storeIDStr, string(user.Role))
 	if err != nil {

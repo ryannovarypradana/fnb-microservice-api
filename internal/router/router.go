@@ -38,8 +38,10 @@ func SetupRoutes(app *fiber.App, cfg *config.Config, handlers *handler.Handlers)
 		publicApi.Get("/stores", handlers.Store.GetAllStores)
 		publicApi.Get("/stores/:id", handlers.Store.GetStore)
 
+		publicApi.Get("/stores/by-code/:storeCode", handlers.Store.GetStoreByCode)
+
 		// Endpoint untuk Menu & Kategori berdasarkan Store
-		publicApi.Get("/stores/by-code/:storeCode/menus", handlers.Product.GetMenusByStoreCode)
+		publicApi.Get("/storse/by-code/:storeCode/menus", handlers.Product.GetMenusByStoreCode)
 		publicApi.Get("/stores/by-code/:storeCode/categories", handlers.Product.GetCategoriesByStoreCode)
 
 		// Endpoint untuk membuat pesanan publik

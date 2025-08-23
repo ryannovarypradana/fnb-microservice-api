@@ -18,6 +18,7 @@ type StoreService interface {
 	UpdateStore(ctx context.Context, req *pb.UpdateStoreRequest) (*model.Store, error)
 	DeleteStore(ctx context.Context, id string) error
 	CloneStoreContent(ctx context.Context, sourceStoreID, destStoreID string) error
+	GetStoreByCode(ctx context.Context, code string) (*model.Store, error)
 }
 
 type storeService struct {
@@ -103,4 +104,8 @@ func (s *storeService) DeleteStore(ctx context.Context, id string) error {
 func (s *storeService) CloneStoreContent(ctx context.Context, sourceStoreID, destStoreID string) error {
 	log.Printf("Placeholder: Cloning content from store %s to %s", sourceStoreID, destStoreID)
 	return nil
+}
+
+func (s *storeService) GetStoreByCode(ctx context.Context, code string) (*model.Store, error) {
+	return s.repo.FindByCode(ctx, code)
 }
