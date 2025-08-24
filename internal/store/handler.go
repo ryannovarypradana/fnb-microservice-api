@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 
+	"github.com/google/uuid"
 	pb "github.com/ryannovarypradana/fnb-microservice-api/pkg/grpc/protoc/store"
 	"github.com/ryannovarypradana/fnb-microservice-api/pkg/model" // Pastikan import model Anda benar
 	"google.golang.org/grpc"
@@ -22,9 +23,16 @@ func NewStoreGRPCHandler(grpcServer *grpc.Server, service StoreService) {
 
 // toProto adalah helper untuk mengubah model.Store menjadi pb.Store
 func toProto(store *model.Store) *pb.Store {
+	if store == nil {
+		return nil
+	}
+	companyIDStr := ""
+	if store.CompanyID != uuid.Nil {
+		companyIDStr = store.CompanyID.String()
+	}
 	return &pb.Store{
 		Id:        store.ID.String(),
-		CompanyId: store.CompanyID.String(),
+		CompanyId: companyIDStr,
 		Name:      store.Name,
 		Address:   store.Location,
 		Code:      store.Code,
@@ -55,7 +63,7 @@ func (h *StoreGRPCHandler) GetAllStores(ctx context.Context, req *pb.GetAllStore
 
 	var pbStores []*pb.Store
 	for _, store := range stores {
-		pbStores = append(pbStores, toProto(store)) // Menggunakan helper di sini
+		pbStores = append(pbStores, toProto(store))
 	}
 
 	return &pb.GetAllStoresResponse{Stores: pbStores}, nil
@@ -88,11 +96,5 @@ func (h *StoreGRPCHandler) GetStoreByCode(ctx context.Context, req *pb.GetStoreB
 	if err != nil {
 		return nil, status.Errorf(codes.NotFound, "store not found: %v", err)
 	}
-	return &pb.GetStoreResponse{Store: &pb.Store{
-		Id:        store.ID.String(),
-		CompanyId: store.CompanyID.String(),
-		Name:      store.Name,
-		Address:   store.Location,
-		Code:      store.Code,
-	}}, nil
+	return &pb.GetStoreResponse{Store: toProto(store)}, nil
 }

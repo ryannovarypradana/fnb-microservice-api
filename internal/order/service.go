@@ -51,13 +51,11 @@ func (s *orderService) CreateOrder(ctx context.Context, req *pb.CreateOrderReque
 	var totalAmount float64
 
 	for _, item := range req.Items {
-		// Mengambil produk dari product-service
 		product, err := s.productClient.GetMenuByID(ctx, &productPB.GetMenuByIDRequest{MenuId: item.ProductId})
 		if err != nil {
 			return nil, fmt.Errorf("product %s not found", item.ProductId)
 		}
 
-		// Mengubah ID produk dari string menjadi UUID
 		productIDUUID, err := uuid.Parse(product.Menu.Id)
 		if err != nil {
 			return nil, fmt.Errorf("cannot parse product id from response: %v", err)
@@ -94,7 +92,6 @@ func (s *orderService) GetOrder(ctx context.Context, req *pb.GetOrderRequest) (*
 func (s *orderService) CalculateBill(ctx context.Context, req *pb.CalculateBillRequest) (*pb.BillResponse, error) {
 	var subtotal float64
 	for _, item := range req.Items {
-		// Mengambil produk dari product-service
 		product, err := s.productClient.GetMenuByID(ctx, &productPB.GetMenuByIDRequest{MenuId: item.ProductId})
 		if err != nil {
 			return nil, fmt.Errorf("product with id %s not found", item.ProductId)
@@ -113,7 +110,6 @@ func (s *orderService) CalculateBill(ctx context.Context, req *pb.CalculateBillR
 }
 
 func (s *orderService) CreatePublicOrder(ctx context.Context, req *pb.CreatePublicOrderRequest) (*model.Order, error) {
-	// Diperbaiki: Menggunakan StoreCode sesuai dengan file proto
 	storeRes, err := s.storeClient.GetStoreByCode(ctx, &storePB.GetStoreByCodeRequest{StoreCode: req.StoreCode})
 	if err != nil {
 		return nil, errors.New("store not found")

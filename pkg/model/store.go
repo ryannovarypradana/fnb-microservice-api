@@ -37,8 +37,8 @@ func (o OpeningHours) Value() (driver.Value, error) {
 // Store defines the GORM model for a store.
 type Store struct {
 	ID               uuid.UUID     `gorm:"type:uuid;primary_key;default:gen_random_uuid()" json:"id"`
-	Code             string        `gorm:"type:varchar(10);unique;not null" json:"code"`
-	Name             string        `gorm:"type:varchar(255);not null" json:"name"`
+	Code             string        `gorm:"unique;not null" json:"code"`
+	Name             string        `gorm:"not null" json:"name"`
 	Location         string        `json:"location"` // Renamed from Address
 	TaxPercentage    *float64      `gorm:"not null;default:11.0" json:"taxPercentage"`
 	CompanyID        uuid.UUID     `gorm:"type:uuid;not null" json:"companyId"`

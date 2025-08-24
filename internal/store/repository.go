@@ -69,11 +69,6 @@ func (r *storeRepository) Delete(ctx context.Context, id string) error {
 
 func (r *storeRepository) FindByCode(ctx context.Context, code string) (*model.Store, error) {
 	var store model.Store
-	if err := r.db.WithContext(ctx).Where("code = ?", code).First(&store).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, errors.New("store not found")
-		}
-		return nil, err
-	}
-	return &store, nil
+	err := r.db.WithContext(ctx).Where("code = ?", code).First(&store).Error
+	return &store, err // Mengembalikan error GORM secara langsung
 }

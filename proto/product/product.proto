@@ -12,7 +12,7 @@ message Menu {
   double price = 4;
   string image_url = 5;
   string category_id = 6;
-  string category_name = 7; // Untuk kemudahan di response
+  string category_name = 7;
   string store_id = 8;
   string created_at = 9;
   string updated_at = 10;
@@ -77,7 +77,6 @@ message GetMenusByStoreIDRequest {
 message GetMenusByStoreIDResponse {
     repeated Menu menus = 1;
 }
-
 
 // Request & Response untuk Kategori
 message CreateCategoryRequest {

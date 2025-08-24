@@ -22,7 +22,6 @@ func NewProductGRPCHandler(service IService) *ProductGRPCHandler {
 }
 
 // --- Menu RPC Handlers ---
-
 func (h *ProductGRPCHandler) CreateMenu(ctx context.Context, req *product.CreateMenuRequest) (*product.CreateMenuResponse, error) {
 	categoryID, err := uuid.Parse(req.GetCategoryId())
 	if err != nil {
@@ -123,7 +122,6 @@ func (h *ProductGRPCHandler) GetMenusByStoreID(ctx context.Context, req *product
 }
 
 // --- Category RPC Handlers ---
-
 func (h *ProductGRPCHandler) CreateCategory(ctx context.Context, req *product.CreateCategoryRequest) (*product.CreateCategoryResponse, error) {
 	storeID, err := uuid.Parse(req.GetStoreId())
 	if err != nil {

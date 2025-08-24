@@ -27,7 +27,7 @@ message RegisterStaffRequest {
     string password = 3;
     string role = 4;
     string store_id = 5;
-    string actor_company_id = 6; // ID Perusahaan dari user yang membuat (misal: COMPANY_REP)
+    string actor_company_id = 6;
 }
 
 message RegisterStaffResponse {
@@ -35,12 +35,10 @@ message RegisterStaffResponse {
 }
 
 // --- PESAN BARU ---
-
 message UpdateUserRequest {
-    string id = 1; // ID user yang akan diupdate
+    string id = 1;
     optional string name = 2;
     optional string email = 3;
-    // Password tidak diupdate di sini, biasanya melalui endpoint terpisah
 }
 
 message DeleteUserRequest {
@@ -65,13 +63,9 @@ message CreateCompanyWithRepResponse {
     User user = 3;
 }
 
-// --- SERVICE YANG DIPERBARUI ---
-
 service UserService {
     rpc GetUser(GetUserRequest) returns (GetUserResponse);
     rpc RegisterStaff(RegisterStaffRequest) returns (RegisterStaffResponse);
-
-    // RPC Baru
     rpc UpdateUser(UpdateUserRequest) returns (GetUserResponse);
     rpc DeleteUser(DeleteUserRequest) returns (DeleteUserResponse);
     rpc CreateCompanyWithRep(CreateCompanyWithRepRequest) returns (CreateCompanyWithRepResponse);

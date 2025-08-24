@@ -4,11 +4,15 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log"
+	"math/rand"
+	"time"
 
 	"github.com/google/uuid"
 	pb "github.com/ryannovarypradana/fnb-microservice-api/pkg/grpc/protoc/store"
 	"github.com/ryannovarypradana/fnb-microservice-api/pkg/model"
+	"gorm.io/gorm"
 )
 
 type StoreService interface {
@@ -29,16 +33,24 @@ func NewStoreService(repo StoreRepository) StoreService {
 	return &storeService{repo: repo}
 }
 
+// CreateStore adalah handler untuk membuat toko baru.
 func (s *storeService) CreateStore(ctx context.Context, req *pb.CreateStoreRequest) (*model.Store, error) {
 	companyID, err := uuid.Parse(req.CompanyId)
 	if err != nil {
 		return nil, errors.New("invalid company id format")
 	}
 
+	// Memanggil fungsi yang diperbarui untuk memastikan kode unik
+	uniqueCode, err := s.generateUniqueStoreCode(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	store := &model.Store{
 		Name:      req.Name,
-		Location:  req.Address, // Maps Address from proto to Location in model
+		Location:  req.Address,
 		CompanyID: companyID,
+		Code:      uniqueCode, // Gunakan kode yang unik
 	}
 
 	if err := s.repo.Create(ctx, store); err != nil {
@@ -108,4 +120,22 @@ func (s *storeService) CloneStoreContent(ctx context.Context, sourceStoreID, des
 
 func (s *storeService) GetStoreByCode(ctx context.Context, code string) (*model.Store, error) {
 	return s.repo.FindByCode(ctx, code)
+}
+
+// generateUniqueStoreCode adalah helper function yang diperbarui
+func (s *storeService) generateUniqueStoreCode(ctx context.Context) (string, error) {
+	r := rand.New(rand.NewSource(time.Now().UnixNano()))
+
+	for i := 0; i < 100; i++ {
+		code := fmt.Sprintf("%04d", r.Intn(9000)+1000)
+		_, err := s.repo.FindByCode(ctx, code)
+		if errors.Is(err, gorm.ErrRecordNotFound) { // Periksa error GORM yang asli
+			return code, nil
+		}
+		if err != nil {
+			// Jika ada error lain (misal: koneksi DB), kembalikan error tersebut
+			return "", err
+		}
+	}
+	return "", errors.New("gagal membuat kode toko unik setelah 100 percobaan")
 }

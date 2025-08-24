@@ -3,6 +3,8 @@ package handler
 import (
 	"github.com/gofiber/fiber/v2"
 	pb "github.com/ryannovarypradana/fnb-microservice-api/pkg/grpc/protoc/store"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 type StoreHandler struct {
@@ -51,9 +53,20 @@ func (h *StoreHandler) GetStoreByCode(c *fiber.Ctx) error {
 
 	res, err := h.client.GetStoreByCode(c.Context(), req)
 	if err != nil {
-		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": err.Error()})
+		// Handle error specifically for not found cases from gRPC status
+		st, ok := status.FromError(err)
+		if ok && st.Code() == codes.NotFound {
+			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": st.Message()})
+		}
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 	}
-	return c.JSON(res)
+
+	// Check if the store object is actually present in the response
+	if res == nil || res.Store == nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "store not found"})
+	}
+
+	return c.JSON(res.Store)
 }
 
 // --- FUNGSI BARU SELESAI DI SINI ---
