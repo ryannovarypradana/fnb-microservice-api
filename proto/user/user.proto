@@ -1,3 +1,5 @@
+// File: ryannovarypradana/fnb-microservice-api/fnb-microservice-api-dd6285232082f71efc6950ba298fd97bc68fbcc3/proto/user/user.proto
+
 syntax = "proto3";
 
 package user;
@@ -21,6 +23,23 @@ message GetUserResponse {
     User user = 1;
 }
 
+// --- PESAN BARU UNTUK GET ALL USERS ---
+message GetAllUsersRequest {
+    int32 page = 1;
+    int32 limit = 2;
+    optional string store_id = 3;
+    optional string company_id = 4;
+    optional string search = 5;
+}
+
+message GetAllUsersResponse {
+    repeated User users = 1;
+    int32 total = 2;
+    int32 page = 3;
+    int32 limit = 4;
+}
+// --- AKHIR PESAN BARU ---
+
 message RegisterStaffRequest {
     string name = 1;
     string email = 2;
@@ -34,7 +53,6 @@ message RegisterStaffResponse {
     User user = 1;
 }
 
-// --- PESAN BARU ---
 message UpdateUserRequest {
     string id = 1;
     optional string name = 2;
@@ -69,4 +87,6 @@ service UserService {
     rpc UpdateUser(UpdateUserRequest) returns (GetUserResponse);
     rpc DeleteUser(DeleteUserRequest) returns (DeleteUserResponse);
     rpc CreateCompanyWithRep(CreateCompanyWithRepRequest) returns (CreateCompanyWithRepResponse);
+    // --- RPC BARU ---
+    rpc GetAllUsers(GetAllUsersRequest) returns (GetAllUsersResponse);
 }

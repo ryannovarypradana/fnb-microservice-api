@@ -1,3 +1,5 @@
+// File: ryannovarypradana/fnb-microservice-api/fnb-microservice-api-dd6285232082f71efc6950ba298fd97bc68fbcc3/internal/user/service.go
+
 package user
 
 import (
@@ -18,6 +20,7 @@ type UserService interface {
 	UpdateUser(ctx context.Context, req *userPB.UpdateUserRequest) (*model.User, error)
 	DeleteUser(ctx context.Context, id string) error
 	CreateCompanyWithRep(ctx context.Context, req *userPB.CreateCompanyWithRepRequest) (*companyPB.Company, *model.User, error)
+	GetAllUsers(ctx context.Context, req *userPB.GetAllUsersRequest) ([]*model.User, int64, error)
 }
 
 type userService struct {
@@ -33,6 +36,11 @@ func (s *userService) GetUser(ctx context.Context, req *userPB.GetUserRequest) (
 	return s.repo.FindByID(ctx, req.Id)
 }
 
+// Fungsi baru untuk memanggil repository
+func (s *userService) GetAllUsers(ctx context.Context, req *userPB.GetAllUsersRequest) ([]*model.User, int64, error) {
+	return s.repo.FindAll(ctx, req)
+}
+
 func (s *userService) RegisterStaff(ctx context.Context, req *userPB.RegisterStaffRequest) (*model.User, error) {
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 	if err != nil {
@@ -45,7 +53,7 @@ func (s *userService) RegisterStaff(ctx context.Context, req *userPB.RegisterSta
 		Name:     req.Name,
 		Email:    req.Email,
 		Password: string(hashedPassword),
-		Role:     model.Role(req.Role), // This cast is correct
+		Role:     model.Role(req.Role),
 		StoreID:  &storeID,
 	}
 
@@ -100,7 +108,7 @@ func (s *userService) CreateCompanyWithRep(ctx context.Context, req *userPB.Crea
 		Name:      req.UserName,
 		Email:     req.UserEmail,
 		Password:  string(hashedPassword),
-		Role:      model.RoleCompanyRep, // This constant is defined in pkg/model/role.go
+		Role:      model.RoleCompanyRep,
 		CompanyID: &companyID,
 	}
 

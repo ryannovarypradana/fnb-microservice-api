@@ -1,6 +1,10 @@
+// File: ryannovarypradana/fnb-microservice-api/fnb-microservice-api-dd6285232082f71efc6950ba298fd97bc68fbcc3/pkg/grpc/handler/user_handler.go
+
 package handler
 
 import (
+	"strconv"
+
 	"github.com/gofiber/fiber/v2"
 	pb "github.com/ryannovarypradana/fnb-microservice-api/pkg/grpc/protoc/user"
 )
@@ -24,7 +28,34 @@ func (h *UserHandler) GetUser(c *fiber.Ctx) error {
 	return c.JSON(res)
 }
 
-// --- HANDLER BARU ---
+// HANDLER BARU UNTUK GET ALL USERS
+func (h *UserHandler) GetAllUsers(c *fiber.Ctx) error {
+	page, _ := strconv.Atoi(c.Query("page", "1"))
+	limit, _ := strconv.Atoi(c.Query("limit", "10"))
+	storeID := c.Query("store_id")
+	companyID := c.Query("company_id")
+	search := c.Query("search")
+
+	req := &pb.GetAllUsersRequest{
+		Page:  int32(page),
+		Limit: int32(limit),
+	}
+	if storeID != "" {
+		req.StoreId = &storeID
+	}
+	if companyID != "" {
+		req.CompanyId = &companyID
+	}
+	if search != "" {
+		req.Search = &search
+	}
+
+	res, err := h.client.GetAllUsers(c.Context(), req)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+	}
+	return c.JSON(res)
+}
 
 func (h *UserHandler) UpdateUser(c *fiber.Ctx) error {
 	id := c.Params("id")

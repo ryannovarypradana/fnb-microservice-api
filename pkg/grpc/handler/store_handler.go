@@ -1,6 +1,8 @@
 package handler
 
 import (
+	"encoding/json"
+
 	"github.com/gofiber/fiber/v2"
 	pb "github.com/ryannovarypradana/fnb-microservice-api/pkg/grpc/protoc/store"
 	"google.golang.org/grpc/codes"
@@ -13,6 +15,32 @@ type StoreHandler struct {
 
 func NewStoreHandler(client pb.StoreServiceClient) *StoreHandler {
 	return &StoreHandler{client: client}
+}
+
+// DTO untuk Company dalam respons JSON
+type CompanyResponse struct {
+	ID        string `json:"id"`
+	Code      string `json:"code"`
+	CreatedAt string `json:"createdAt"`
+	UpdatedAt string `json:"updatedAt"`
+	Name      string `json:"name"`
+}
+
+// DTO untuk Store dalam respons JSON
+type StoreResponse struct {
+	ID               string           `json:"id"`
+	Code             string           `json:"code"`
+	CreatedAt        string           `json:"createdAt"`
+	UpdatedAt        string           `json:"updatedAt"`
+	Name             string           `json:"name"`
+	Location         string           `json:"location"`
+	TaxPercentage    float32          `json:"taxPercentage"`
+	CompanyID        string           `json:"companyId"`
+	Company          *CompanyResponse `json:"company"`
+	OperationalHours interface{}      `json:"operationalHours"`
+	Latitude         float64          `json:"latitude"`
+	Longitude        float64          `json:"longitude"`
+	BannerImageURL   string           `json:"bannerImageUrl"`
 }
 
 func (h *StoreHandler) CreateStore(c *fiber.Ctx) error {
@@ -46,14 +74,12 @@ func (h *StoreHandler) GetStore(c *fiber.Ctx) error {
 	return c.JSON(res)
 }
 
-// --- FUNGSI BARU DIMULAI DI SINI ---
 func (h *StoreHandler) GetStoreByCode(c *fiber.Ctx) error {
 	storeCode := c.Params("storeCode")
 	req := &pb.GetStoreByCodeRequest{StoreCode: storeCode}
 
 	res, err := h.client.GetStoreByCode(c.Context(), req)
 	if err != nil {
-		// Handle error specifically for not found cases from gRPC status
 		st, ok := status.FromError(err)
 		if ok && st.Code() == codes.NotFound {
 			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": st.Message()})
@@ -61,15 +87,40 @@ func (h *StoreHandler) GetStoreByCode(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 	}
 
-	// Check if the store object is actually present in the response
 	if res == nil || res.Store == nil {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "store not found"})
 	}
 
-	return c.JSON(res.Store)
-}
+	storeData := res.Store
+	var opHours interface{}
+	if storeData.OperationalHours != "" {
+		_ = json.Unmarshal([]byte(storeData.OperationalHours), &opHours)
+	}
 
-// --- FUNGSI BARU SELESAI DI SINI ---
+	response := StoreResponse{
+		ID:            storeData.Id,
+		Code:          storeData.Code,
+		CreatedAt:     storeData.CreatedAt,
+		UpdatedAt:     storeData.UpdatedAt,
+		Name:          storeData.Name,
+		Location:      storeData.Address,
+		TaxPercentage: storeData.TaxPercentage,
+		CompanyID:     storeData.Company.Id,
+		Company: &CompanyResponse{
+			ID:        storeData.Company.Id,
+			Code:      storeData.Company.Code,
+			CreatedAt: storeData.Company.CreatedAt,
+			UpdatedAt: storeData.Company.UpdatedAt,
+			Name:      storeData.Company.Name,
+		},
+		OperationalHours: opHours,
+		Latitude:         storeData.Latitude,
+		Longitude:        storeData.Longitude,
+		BannerImageURL:   storeData.BannerImageUrl,
+	}
+
+	return c.JSON(response)
+}
 
 func (h *StoreHandler) GetAllStores(c *fiber.Ctx) error {
 	searchQuery := c.Query("search")

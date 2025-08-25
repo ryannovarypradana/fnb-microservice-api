@@ -245,7 +245,7 @@ func (h *productHandler) GetMenusByStoreCode(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "failed to get menus for the store"})
 	}
 
-	return c.Status(fiber.StatusOK).JSON(menusRes)
+	return c.Status(fiber.StatusOK).JSON(menusRes.Menus)
 }
 
 // GetMenusByStoreID mengambil menu berdasarkan ID toko
@@ -260,7 +260,7 @@ func (h *productHandler) GetMenusByStoreID(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "failed to get menus"})
 	}
 
-	return c.Status(fiber.StatusOK).JSON(menusRes)
+	return c.Status(fiber.StatusOK).JSON(menusRes.Menus)
 }
 
 // GetCategoriesByStoreCode mengambil kategori berdasarkan store code
@@ -281,7 +281,7 @@ func (h *productHandler) GetCategoriesByStoreCode(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "failed to get categories for the store"})
 	}
 
-	return c.Status(fiber.StatusOK).JSON(categoriesRes)
+	return c.Status(fiber.StatusOK).JSON(categoriesRes.Categories)
 }
 
 // GetCategoriesByStoreID mengambil kategori berdasarkan ID toko
@@ -295,5 +295,5 @@ func (h *productHandler) GetCategoriesByStoreID(c *fiber.Ctx) error {
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "failed to get categories"})
 	}
-	return c.Status(fiber.StatusOK).JSON(categoriesRes)
+	return c.Status(fiber.StatusOK).JSON(categoriesRes.Categories)
 }

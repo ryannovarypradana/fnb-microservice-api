@@ -31,7 +31,7 @@ func (r *storeRepository) Create(ctx context.Context, store *model.Store) error 
 
 func (r *storeRepository) FindByID(ctx context.Context, id string) (*model.Store, error) {
 	var store model.Store
-	if err := r.db.WithContext(ctx).Where("id = ?", id).First(&store).Error; err != nil {
+	if err := r.db.WithContext(ctx).Preload("Company").Where("id = ?", id).First(&store).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, errors.New("store not found")
 		}
@@ -42,7 +42,7 @@ func (r *storeRepository) FindByID(ctx context.Context, id string) (*model.Store
 
 func (r *storeRepository) FindAll(ctx context.Context, search string) ([]*model.Store, error) {
 	var stores []*model.Store
-	query := r.db.WithContext(ctx)
+	query := r.db.WithContext(ctx).Preload("Company")
 	if search != "" {
 		query = query.Where("name ILIKE ?", "%"+search+"%")
 	}
@@ -69,6 +69,6 @@ func (r *storeRepository) Delete(ctx context.Context, id string) error {
 
 func (r *storeRepository) FindByCode(ctx context.Context, code string) (*model.Store, error) {
 	var store model.Store
-	err := r.db.WithContext(ctx).Where("code = ?", code).First(&store).Error
-	return &store, err // Mengembalikan error GORM secara langsung
+	err := r.db.WithContext(ctx).Preload("Company").Where("code = ?", code).First(&store).Error
+	return &store, err
 }

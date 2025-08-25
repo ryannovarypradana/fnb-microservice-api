@@ -54,6 +54,8 @@ func SetupRoutes(app *fiber.App, cfg *config.Config, handlers *handler.Handlers)
 	// Rute User
 	users := authRequired.Group("/users")
 	{
+		users.Post("/staff", middleware.Authorize(model.RoleSuperAdmin, model.RoleCompanyRep, model.RoleStoreAdmin), handlers.Auth.RegisterStaff)
+		users.Get("/", handlers.User.GetAllUsers)
 		users.Get("/:id", handlers.User.GetUser)
 		users.Put("/:id", handlers.User.UpdateUser)
 		users.Delete("/:id", middleware.Authorize(model.RoleSuperAdmin, model.RoleCompanyRep, model.RoleAdmin), handlers.User.DeleteUser)

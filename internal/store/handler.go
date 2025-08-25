@@ -2,10 +2,12 @@ package store
 
 import (
 	"context"
+	"encoding/json"
+	"time"
 
 	"github.com/google/uuid"
 	pb "github.com/ryannovarypradana/fnb-microservice-api/pkg/grpc/protoc/store"
-	"github.com/ryannovarypradana/fnb-microservice-api/pkg/model" // Pastikan import model Anda benar
+	"github.com/ryannovarypradana/fnb-microservice-api/pkg/model"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -21,21 +23,62 @@ func NewStoreGRPCHandler(grpcServer *grpc.Server, service StoreService) {
 	pb.RegisterStoreServiceServer(grpcServer, handler)
 }
 
-// toProto adalah helper untuk mengubah model.Store menjadi pb.Store
+func toProtoCompany(company *model.Company) *pb.Company {
+	if company == nil || company.ID == uuid.Nil {
+		return nil
+	}
+	return &pb.Company{
+		Id:        company.ID.String(),
+		Name:      company.Name,
+		Code:      company.Code,
+		CreatedAt: company.CreatedAt.Format(time.RFC3339),
+		UpdatedAt: company.UpdatedAt.Format(time.RFC3339),
+	}
+}
+
+// toProto adalah helper yang telah diperbarui untuk mengubah model.Store menjadi pb.Store dengan aman
 func toProto(store *model.Store) *pb.Store {
 	if store == nil {
 		return nil
 	}
-	companyIDStr := ""
-	if store.CompanyID != uuid.Nil {
-		companyIDStr = store.CompanyID.String()
+
+	opHoursStr := ""
+	if store.OperationalHours != nil {
+		bytes, err := json.Marshal(store.OperationalHours)
+		if err == nil {
+			opHoursStr = string(bytes)
+		}
 	}
+
+	// Pemeriksaan nilai nil untuk pointer
+	var taxPercentage float32
+	if store.TaxPercentage != nil {
+		taxPercentage = float32(*store.TaxPercentage)
+	}
+
+	var latitude float64
+	if store.Latitude != nil {
+		latitude = *store.Latitude
+	}
+
+	var longitude float64
+	if store.Longitude != nil {
+		longitude = *store.Longitude
+	}
+
 	return &pb.Store{
-		Id:        store.ID.String(),
-		CompanyId: companyIDStr,
-		Name:      store.Name,
-		Address:   store.Location,
-		Code:      store.Code,
+		Id:               store.ID.String(),
+		Name:             store.Name,
+		Address:          store.Location,
+		Code:             store.Code,
+		BannerImageUrl:   store.BannerImageURL,
+		TaxPercentage:    taxPercentage,
+		OperationalHours: opHoursStr,
+		Latitude:         latitude,
+		Longitude:        longitude,
+		Company:          toProtoCompany(&store.Company),
+		CreatedAt:        store.CreatedAt.Format(time.RFC3339),
+		UpdatedAt:        store.UpdatedAt.Format(time.RFC3339),
 	}
 }
 

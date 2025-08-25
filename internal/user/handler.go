@@ -1,3 +1,4 @@
+// File: ryannovarypradana/fnb-microservice-api/fnb-microservice-api-dd6285232082f71efc6950ba298fd97bc68fbcc3/internal/user/handler.go
 package user
 
 import (
@@ -19,6 +20,40 @@ func NewUserGRPCHandler(grpcServer *grpc.Server, service UserService) {
 	pb.RegisterUserServiceServer(grpcServer, handler)
 }
 
+// Fungsi baru untuk menangani RPC GetAllUsers
+func (h *UserGRPCHandler) GetAllUsers(ctx context.Context, req *pb.GetAllUsersRequest) (*pb.GetAllUsersResponse, error) {
+	users, total, err := h.service.GetAllUsers(ctx, req)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to get users: %v", err)
+	}
+
+	var pbUsers []*pb.User
+	for _, user := range users {
+		pbUser := &pb.User{
+			Id:    user.ID.String(),
+			Name:  user.Name,
+			Email: user.Email,
+			Role:  string(user.Role),
+		}
+		if user.CompanyID != nil {
+			companyIDStr := user.CompanyID.String()
+			pbUser.CompanyId = &companyIDStr
+		}
+		if user.StoreID != nil {
+			storeIDStr := user.StoreID.String()
+			pbUser.StoreId = &storeIDStr
+		}
+		pbUsers = append(pbUsers, pbUser)
+	}
+
+	return &pb.GetAllUsersResponse{
+		Users: pbUsers,
+		Total: int32(total),
+		Page:  req.Page,
+		Limit: req.Limit,
+	}, nil
+}
+
 func (h *UserGRPCHandler) GetUser(ctx context.Context, req *pb.GetUserRequest) (*pb.GetUserResponse, error) {
 	foundUser, err := h.service.GetUser(ctx, req)
 	if err != nil {
@@ -34,7 +69,6 @@ func (h *UserGRPCHandler) GetUser(ctx context.Context, req *pb.GetUserRequest) (
 		},
 	}
 
-	// CORRECTED: Assign the address of the string to the pointer field
 	if foundUser.CompanyID != nil {
 		companyIDStr := foundUser.CompanyID.String()
 		res.User.CompanyId = &companyIDStr
@@ -52,7 +86,6 @@ func (h *UserGRPCHandler) UpdateUser(ctx context.Context, req *pb.UpdateUserRequ
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to update user: %v", err)
 	}
-	// Here, we can reuse the GetUser logic to correctly format the response
 	return h.GetUser(ctx, &pb.GetUserRequest{Id: updatedUser.ID.String()})
 }
 
@@ -76,7 +109,6 @@ func (h *UserGRPCHandler) CreateCompanyWithRep(ctx context.Context, req *pb.Crea
 		Role:  string(user.Role),
 	}
 
-	// CORRECTED: Assign the address of the string to the pointer field
 	if user.CompanyID != nil {
 		companyIDStr := user.CompanyID.String()
 		resUser.CompanyId = &companyIDStr
